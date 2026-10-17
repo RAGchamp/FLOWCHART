@@ -59,6 +59,7 @@
     letter-spacing: .15em; word-spacing: .6em; font-style: italic;
   }
   #sitenav .site-tagline { white-space: nowrap; }
+  #sitenav .site-center { display: flex; align-items: center; gap: 1.5rem; }
   #sitenav .site-right { display: flex; align-items: center; gap: 1rem; }
   /* bright call-to-action so new users can see a finished diagram in one click */
   #btnSample {
@@ -104,8 +105,20 @@
     #sitenav .site-links a + a { border-top: 1px solid rgba(255,214,10,.25); }
     #sitenav .site-links a:hover { background: rgba(255,214,10,.12); text-decoration: none; }
     #sitenav .site-right { gap: .5rem; }
+    #sitenav .site-center { margin-left: auto; margin-right: .5rem; }
     #btnSample { padding: .3rem .8rem; font-size: .85rem; }
   }
+  /* phones: shorter canvas so the Properties panel peeks out below and the page can be scrolled to it */
+  @media (max-width: 800px) and (pointer: coarse) {
+    #stage { height: max(300px, 62svh); }
+  }
+  #btnToPanel {
+    display: none; position: fixed; right: 12px; bottom: 44px; z-index: 30;
+    align-items: center; gap: 6px; padding: 10px 14px; border-radius: 999px;
+    background: var(--banner-bg); color: var(--banner-fg); border: 2px solid var(--banner-fg);
+    font: inherit; font-weight: 700; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,.3); cursor: pointer;
+  }
+  #btnToPanel svg { width: 16px; height: 16px; }
   @media (max-width: 360px) {
     #sitenav .site-logo { height: 26px; }
     #btnSample svg { display: none; }
@@ -174,6 +187,8 @@
     padding: 16px; background: rgba(20,83,45,.12); z-index: 5;
   }
   #welcome[hidden] { display: none; }
+  /* keep the canvas blank behind the welcome box; the saved diagram appears on Get started */
+  #stage.welcoming #shapesLayer, #stage.welcoming #overlayLayer, #stage.welcoming #traceImg { visibility: hidden; }
   .welcome-box {
     max-width: 560px; width: 100%; max-height: 100%; overflow: auto;
     background: var(--welcome-bg); border: 2px solid var(--welcome-border); border-radius: 12px;
@@ -188,6 +203,8 @@
     padding: 7px 16px; border: none; border-radius: 6px; background: var(--nav-bg); color: var(--nav-fg);
     font: inherit; font-weight: 600; cursor: pointer;
   }
+  .welcome-box button.secondary { background: transparent; color: var(--nav-bg); border: 2px solid var(--nav-bg); padding: 5px 14px; }
+  .welcome-box button.secondary:hover { background: rgba(20,83,45,.08); }
   .welcome-box kbd { background: #fff; }
   .icon-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin: 4px 0 8px; }
   .icon-btn { height: 34px; padding: 4px; border: 1px solid var(--border); border-radius: 5px; background: #fff; cursor: pointer; color: #1f2328; }
@@ -261,6 +278,7 @@
     #stage { height: max(360px, calc(100vh - 110px)); overflow: auto; }
     #panel { border-left: none; border-top: 1px solid var(--border); overflow: visible; }
     .tb .lbl { display: none; }
+    #btnToPanel.show { display: inline-flex; }
     /* toolbar stays one row and scrolls sideways instead of wrapping */
     #topbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
     .group { flex: none; }
@@ -278,15 +296,17 @@
         <text x="58" y="33" font-family="'Segoe UI', Verdana, Arial, sans-serif" font-weight="700" font-size="26" letter-spacing="0.3" fill="#ffd60a">RAG Champ</text>
       </svg>
     </span>
-    <div class="site-links" id="siteLinks">
-      <a href="https://ragchamp.github.io/FLOWCHART/guide.html" target="_blank" rel="noopener">User Guide</a>
-      <a href="https://ragchamp.github.io/FLOWCHART/sample-json.json" target="_blank" rel="noopener">Sample JSON</a>
-      <a href="https://ragchamp.github.io/FLOWCHART/Sample-flow-diag.jpg" target="_blank" rel="noopener">Sample Flow Diag</a>
-      <a href="https://ragchamp.github.io/FLOWCHART/contactus.html" target="_blank" rel="noopener">Contact Us</a>
-    </div>
-    <div class="site-right">
+    <div class="site-center">
+      <div class="site-links" id="siteLinks">
+        <a href="https://ragchamp.github.io/FLOWCHART/guide.html" target="_blank" rel="noopener">User Guide</a>
+        <a href="https://ragchamp.github.io/FLOWCHART/sample-json.json" target="_blank" rel="noopener">Sample JSON</a>
+        <a href="https://ragchamp.github.io/FLOWCHART/Sample-flow-diag.jpg" target="_blank" rel="noopener">Sample Flow Diag</a>
+        <a href="https://ragchamp.github.io/FLOWCHART/contactus.html" target="_blank" rel="noopener">Contact Us</a>
+      </div>
       <button id="btnSample" type="button" title="Load a finished sample diagram to explore">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>Show sample</button>
+    </div>
+    <div class="site-right">
       <div class="site-tagline">FLOW CHART BUILDER</div>
       <button id="btnMenu" type="button" aria-label="More links" aria-expanded="false" aria-controls="siteLinks">
         <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
@@ -348,7 +368,7 @@
   </header>
 
   <!-- =================== CANVAS =================== -->
-  <main id="stage">
+  <main id="stage" class="welcoming">
     <svg id="canvas" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
       <defs>
         <pattern id="gridPattern" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -367,6 +387,7 @@
       <div class="welcome-box">
         <h1 id="welcomeTitle">Welcome to Flow Chart Builder</h1>
         <p>Build curved, ribbon-style flow diagrams that are hard to make in PowerPoint, Excel or Publisher.</p>
+        <div id="welcomeMore" hidden>
         <ol>
           <li><b>Arc</b>: click the center, then the start point, then the end point to draw a thick curved band.</li>
           <li><b>Bézier</b>: click a start and an end point, then drag the two filled control points to make S-shapes and swoops.</li>
@@ -379,7 +400,8 @@
           <li><b>Trace image</b>: upload a picture of a flowchart to show it behind the canvas and draw over it. <b>Clear image</b> removes it when you're done.</li>
         </ol>
         <p>Band ends snap together so pieces join cleanly. Click <b>Example</b> to see a finished diagram.</p>
-        <div class="go"><button id="welcomeStart">Get started</button><span>or press <kbd>Enter</kbd></span></div>
+        </div>
+        <div class="go"><button id="welcomeStart">Get started</button><button id="welcomeLearn" class="secondary" aria-controls="welcomeMore" aria-expanded="false">Learn more</button></div>
       </div>
     </div>
     <div id="toast"></div>
@@ -387,6 +409,8 @@
 
   <!-- =================== RIGHT PANEL =================== -->
   <aside id="panel"></aside>
+  <button id="btnToPanel" type="button" title="Scroll down to the Properties panel">
+    <span>Edit properties</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
 
   <!-- =================== STATUS BAR =================== -->
   <footer id="status"><span id="hint"></span><span id="coords"></span></footer>
@@ -1705,7 +1729,35 @@ function startPan(e) {
   drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, ox: view.x, oy: view.y, sl: stage.scrollLeft, st: stage.scrollTop };
   svg.classList.add('panning');
 }
+// Two-finger pinch zooms and pans on touch screens; it cancels whatever the first finger started.
+const touches = new Map();
+let pinch = null, pinchLock = false;
+function touchMid() {
+  const [a, b] = [...touches.values()];
+  return { cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) || 1 };
+}
+function startPinch() {
+  if (drag && drag.orig) { const i = state.shapes.findIndex(s => s.id === drag.orig.id); if (i >= 0) state.shapes[i] = drag.orig; }
+  if (creating) cancelCreate();
+  drag = null; snapMark = null; svg.classList.remove('panning');
+  pinch = touchMid(); pinchLock = true;
+  render();
+}
+function movePinch() {
+  const m = touchMid(), r = svg.getBoundingClientRect();
+  zoomAt(m.d / pinch.d, m.cx - r.left, m.cy - r.top);
+  // then pan by how far the midpoint between the fingers moved on screen
+  const dx = m.cx - pinch.cx, dy = m.cy - pinch.cy;
+  if (scrollMode()) { stage.scrollLeft -= dx; stage.scrollTop -= dy; }
+  else { view.x += dx; view.y += dy; applyView(); }
+  pinch = m;
+}
 svg.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'touch') {
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size === 2) { startPinch(); return; }
+    if (pinchLock || touches.size > 2) return;
+  }
   if (e.button === 1 || (e.button === 0 && spaceDown)) { e.preventDefault(); svg.setPointerCapture(e.pointerId); startPan(e); return; }
   if (e.button !== 0) return;
   svg.setPointerCapture(e.pointerId);
@@ -1714,6 +1766,11 @@ svg.addEventListener('pointerdown', e => {
   render();
 });
 svg.addEventListener('pointermove', e => {
+  if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && touches.size === 2) { movePinch(); return; }
+    if (pinchLock) return;
+  }
   const p = toWorld(e);
   $('#coords').textContent = `x ${Math.round(p[0])}, y ${Math.round(p[1])} · ${Math.round(view.k * 100)}%`;
   if (drag && drag.kind === 'pan') {
@@ -1730,6 +1787,11 @@ svg.addEventListener('pointermove', e => {
   if (changed) render(); else renderOverlay();
 });
 function pointerEnd(e) {
+  if (e.pointerType === 'touch') {
+    touches.delete(e.pointerId);
+    if (touches.size < 2) pinch = null;
+    if (pinchLock) { if (!touches.size) pinchLock = false; return; } // ignore the fingers left after a pinch
+  }
   if (drag && drag.kind === 'pan') { drag = null; svg.classList.remove('panning'); return; }
   const tool = TOOLS[state.tool];
   if (tool.up) tool.up(toWorld(e), e);
@@ -1746,6 +1808,11 @@ svg.addEventListener('wheel', e => {
   zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
 }, { passive: false });
 narrowMQ.addEventListener('change', () => zoomToFit());
+// "Edit properties" shortcut: shown on narrow screens while the panel is scrolled out of view
+var panelVisible = true; // var: buildPanel() may call updateToPanel() before this line runs
+function updateToPanel() { $('#btnToPanel').classList.toggle('show', scrollMode() && !panelVisible && !!byId(state.selectedId)); }
+new IntersectionObserver(([en]) => { panelVisible = en.isIntersecting; updateToPanel(); }, { threshold: 0.15 }).observe(panel);
+$('#btnToPanel').addEventListener('click', () => panel.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 window.addEventListener('resize', () => { if (scrollMode()) applyView(); });
 svg.addEventListener('dblclick', e => {
   // double-click a shape in Select mode to jump to its text field (a piece's text, or a title)
@@ -1949,6 +2016,7 @@ function buildPanel() {
   }
   panel.innerHTML = h;
   syncPanel(true);
+  updateToPanel();
 }
 
 function getProp(o, path) { return path.split('.').reduce((v, k) => (v == null ? v : v[k]), o); }
@@ -2343,6 +2411,7 @@ onClick('#btnSample', async () => {
     const res = await fetch(SAMPLE_URL, { cache: 'no-cache' });
     if (!res.ok) throw new Error(`Could not download the sample (HTTP ${res.status}).`);
     const doc = normalizeDoc(await res.json());
+    dismissWelcome();
     loadDoc(doc);
     toast('Sample loaded. Click any shape to change its text or color.');
   } catch (err) {
@@ -2371,8 +2440,20 @@ onClick('#zoomLabel', zoomToFit);
 
 /* ---------- Welcome box: shown on every page load, dismissed with Enter ---------- */
 const welcome = $('#welcome');
-function dismissWelcome() { welcome.hidden = true; }
+function dismissWelcome() {
+  if (welcome.hidden) return;
+  welcome.hidden = true;
+  stage.classList.remove('welcoming');
+  zoomToFit();
+}
 $('#welcomeStart').addEventListener('click', dismissWelcome);
+// the box opens short; "Learn more" reveals the full how-to list
+$('#welcomeLearn').addEventListener('click', e => {
+  $('#welcomeMore').hidden = false;
+  e.currentTarget.hidden = true;
+  e.currentTarget.setAttribute('aria-expanded', 'true');
+  $('#welcomeStart').focus();
+});
 
 document.addEventListener('keydown', e => {
   if (!welcome.hidden) {
