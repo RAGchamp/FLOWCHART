@@ -1,0 +1,2259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flow Chart App</title>
+<style>
+  :root {
+    --bg: #e9ebef;
+    --panel: #ffffff;
+    --nav-bg: #14532d;       /* dark green top bar */
+    --nav-fg: #facc15;       /* yellow top-bar text */
+    --side-bg: #7EE0D9;      /* teal right panel */
+    --side-border: #4fc4bb;
+    --banner-bg: #1e3a8a;    /* deep blue "Properties" banner */
+    --banner-fg: #facc15;    /* yellow banner text */
+    --welcome-bg: #dcfce7;   /* light green welcome box */
+    --welcome-border: #86efac;
+    --border: #d7dae0;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --sel: #2563eb;
+    --danger: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px; color: var(--text); background: var(--bg);
+  }
+  #app {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    grid-template-columns: 1fr 290px;
+    height: 100vh;
+  }
+
+  /* ---------- Top nav ---------- */
+  #topbar {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+    padding: 6px 10px;
+    background: var(--nav-bg); color: var(--nav-fg); border-bottom: 1px solid #0b3d20;
+  }
+  .brand { font-weight: 700; letter-spacing: .02em; margin-right: 8px; white-space: nowrap; }
+  .group { display: flex; gap: 4px; padding-right: 8px; margin-right: 2px; border-right: 1px solid rgba(250,204,21,.35); }
+  .group:last-child { border-right: none; }
+  button.tb {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 9px; border: 1px solid rgba(250,204,21,.45); border-radius: 6px;
+    background: transparent; color: var(--nav-fg); font: inherit; cursor: pointer; white-space: nowrap;
+  }
+  button.tb:hover { background: rgba(250,204,21,.15); }
+  button.tb:disabled { opacity: .4; cursor: default; }
+  button.tb:disabled:hover { background: transparent; }
+  button.tb.active { background: var(--nav-fg); border-color: var(--nav-fg); color: var(--nav-bg); }
+  button.tb:focus-visible { outline: 2px solid var(--nav-fg); outline-offset: 1px; }
+  button.tb svg { width: 18px; height: 18px; flex: none; }
+  #zoomLabel { min-width: 52px; justify-content: center; }
+  /* keep the top bar on one line on laptop-width screens */
+  @media (max-width: 1720px) {
+    #topbar { gap: 4px; padding: 6px 8px; }
+    .brand { margin-right: 4px; }
+    .group { gap: 3px; padding-right: 5px; }
+    button.tb { padding: 5px 6px; gap: 4px; }
+    button.tb svg { width: 16px; height: 16px; }
+    #zoomLabel { min-width: 44px; }
+  }
+  @media (max-width: 1720px) {
+    /* less-used buttons show only their icon (the tooltip still names them) */
+    #btnNew .lbl, #btnExample .lbl, #btnClearTrace .lbl { display: none; }
+  }
+  @media (max-width: 1440px) {
+    .brand { display: none; }
+  }
+
+  /* ---------- Canvas ---------- */
+  #stage { position: relative; overflow: hidden; background: var(--bg); }
+  #canvas { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; cursor: default; }
+  #canvas.draw { cursor: crosshair; }
+  #canvas.space, #canvas.space * { cursor: grab !important; }
+  #canvas.panning, #canvas.panning * { cursor: grabbing !important; }
+  #canvas.tool-select .shape { cursor: move; }
+  #paper { filter: drop-shadow(0 1px 3px rgba(0,0,0,.15)); }
+  #overlayLayer * { pointer-events: none; }
+  #overlayLayer .handle { pointer-events: all; cursor: pointer; }
+  .ov-sel { fill: none; stroke: var(--sel); }
+  .ov-guide { fill: none; stroke: var(--sel); opacity: .7; }
+  .ov-snap { fill: rgba(22,163,74,.15); stroke: #16a34a; }
+  .ov-dot { fill: var(--sel); }
+  .handle { fill: #fff; stroke: var(--sel); }
+  .handle.h-ctrl { fill: var(--sel); }
+  .handle.h-thick { fill: #f59e0b; stroke: #b45309; }
+  .handle.h-center { fill: #e0e7ff; }
+  #welcome {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: 16px; background: rgba(20,83,45,.12); z-index: 5;
+  }
+  #welcome[hidden] { display: none; }
+  .welcome-box {
+    max-width: 560px; width: 100%; max-height: 100%; overflow: auto;
+    background: var(--welcome-bg); border: 2px solid var(--welcome-border); border-radius: 12px;
+    padding: 22px 26px; box-shadow: 0 10px 30px rgba(0,0,0,.18); color: #14532d; line-height: 1.55;
+  }
+  .welcome-box h1 { margin: 0 0 6px; font-size: 22px; }
+  .welcome-box p { margin: 6px 0; }
+  .welcome-box ol { margin: 8px 0; padding-left: 20px; }
+  .welcome-box li { margin: 3px 0; }
+  .welcome-box .go { margin-top: 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .welcome-box button {
+    padding: 7px 16px; border: none; border-radius: 6px; background: var(--nav-bg); color: var(--nav-fg);
+    font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .welcome-box kbd { background: #fff; }
+  .icon-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin: 4px 0 8px; }
+  .icon-btn { height: 34px; padding: 4px; border: 1px solid var(--border); border-radius: 5px; background: #fff; cursor: pointer; color: #1f2328; }
+  .icon-btn svg { width: 100%; height: 100%; }
+  .icon-btn:hover { background: #f4f6f9; }
+  .icon-btn.on { outline: 2px solid var(--accent); border-color: var(--accent); }
+  #toast {
+    position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+    background: #1f2328; color: #fff; padding: 8px 14px; border-radius: 6px;
+    opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90%; z-index: 6;
+  }
+  #toast.show { opacity: .95; }
+  #toast.error { background: var(--danger); }
+
+  /* ---------- Right panel ---------- */
+  #panel { background: var(--side-bg); border-left: 1px solid var(--side-border); overflow: auto; padding: 12px 14px 24px; }
+  #panel .section, #panel .actions { border-top-color: var(--side-border); }
+  #panel .idtag { background: #fff; }
+  #panel .muted, #panel .note, #panel .eyebrow, #panel .section h3 { color: #285e5a; }
+  .props-banner {
+    background: var(--banner-bg); color: var(--banner-fg); text-align: center;
+    border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;
+  }
+  .props-banner .pb-title { font-weight: 700; font-size: 14px; letter-spacing: .08em; }
+  .props-banner .pb-state { font-style: italic; font-weight: 400; font-size: 16px; margin-top: 2px; }
+  .props-banner p { margin: 8px 0 0; line-height: 1.5; }
+  .ph { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+  .ph h2 { margin: 0; font-size: 16px; }
+  .eyebrow { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .idtag { font-size: 11px; color: var(--muted); background: #f1f3f6; padding: 2px 6px; border-radius: 4px; }
+  .section { border-top: 1px solid var(--border); padding: 10px 0 6px; }
+  .section h3 { margin: 0 0 6px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .row { display: grid; grid-template-columns: 88px 1fr; align-items: center; gap: 8px; margin: 6px 0; }
+  .row > span { color: #374151; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .color { display: grid; grid-template-columns: 34px 1fr; gap: 6px; }
+  #panel input[type=number], #panel input[type=text], #panel select, #panel textarea {
+    width: 100%; min-width: 0; padding: 5px 7px; border: 1px solid var(--border); border-radius: 5px;
+    font: inherit; color: inherit; background: #fff;
+  }
+  #panel textarea { resize: vertical; min-height: 54px; }
+  #panel input:focus, #panel select:focus, #panel textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  #panel input[type=color] { width: 34px; height: 29px; padding: 0 2px; border: 1px solid var(--border); border-radius: 5px; background: #fff; cursor: pointer; }
+  #panel input[type=range] { width: 100%; }
+  .chk { display: inline-flex; align-items: center; gap: 5px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 4px; margin: -2px 0 8px 96px; }
+  .sw { width: 18px; height: 18px; border-radius: 4px; border: 1px solid rgba(0,0,0,.25); padding: 0; cursor: pointer; }
+  .sw:hover { transform: scale(1.15); }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .btn { padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px; background: #fff; font: inherit; color: inherit; cursor: pointer; }
+  .btn:hover { background: #f4f6f9; }
+  .btn.danger { color: var(--danger); border-color: #f3b4b4; }
+  .muted, .note { color: var(--muted); line-height: 1.5; }
+  .note { font-size: 12px; margin: 4px 0 8px; }
+  .help { margin: 0; padding-left: 16px; line-height: 1.6; color: #374151; }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; color: #374151; }
+  kbd { font: 11px ui-monospace, Consolas, monospace; background: #f1f3f6; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+
+  /* ---------- Status bar ---------- */
+  #status {
+    grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 12px;
+    padding: 4px 10px; background: var(--panel); border-top: 1px solid var(--border); color: var(--muted);
+    white-space: nowrap; overflow: hidden;
+  }
+  #hint { overflow: hidden; text-overflow: ellipsis; }
+
+  @media (max-width: 800px) {
+    #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr 40vh auto; }
+    #panel { border-left: none; border-top: 1px solid var(--border); }
+    .tb .lbl { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- =================== TOP NAV =================== -->
+  <header id="topbar">
+    <span class="brand">FLOW-CHART-APP</span>
+    <div class="group" id="tools">
+      <button class="tb" data-tool="select" title="Select / move (V)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M5 3l14 8-6.5 1.5L9.5 19z"/></svg><span class="lbl">Select</span></button>
+      <button class="tb" data-tool="arc" title="Arc band (A)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4"><path d="M4 19a8 8 0 0 1 16 0"/></svg><span class="lbl">Arc</span></button>
+      <button class="tb" data-tool="bezier" title="Bézier band (B)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M3 18C10 18 7 6 12 6s3 12 9 12" transform="rotate(-20 12 12)"/></svg><span class="lbl">Bézier</span></button>
+      <button class="tb" data-tool="arrow" title="Arrow / chevron (R)">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9h8V4l10 8-10 8v-5H3z"/></svg><span class="lbl">Arrow</span></button>
+      <button class="tb" data-tool="text" title="Text label (T)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 7V4h14v3M12 4v16M9 20h6"/></svg><span class="lbl">Text</span></button>
+      <button class="tb" data-tool="circle" title="Circle badge (C)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M11 9l1.5-1v8" stroke-linecap="round"/></svg><span class="lbl">Circle</span></button>
+      <button class="tb" data-tool="item" title="Icon with a label, e.g. the cloud and &quot;Data&quot; inside a loop (I)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 12a3 3 0 0 1-.4-5.97A4.5 4.5 0 0 1 16 6.5 2.75 2.75 0 0 1 16 12z" fill="currentColor"/><path d="M8 17h8M10 21h4"/></svg><span class="lbl">Icon</span></button>
+      <button class="tb" data-tool="title" title="Title with subtitle (H)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16M4 11h11"/><path d="M4 16h9M4 20h7" stroke-width="1.5"/></svg><span class="lbl">Title</span></button>
+      <button class="tb" id="btnSnap" title="Snap it: fill the gaps and join all bands into one figure (S)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M5 3v9a7 7 0 0 0 14 0V3h-4v9a3 3 0 0 1-6 0V3z"/><path d="M5 7h4M15 7h4"/></svg><span class="lbl">Snap it</span></button>
+    </div>
+    <div class="group">
+      <button class="tb" id="btnNew" title="New diagram">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg><span class="lbl">New</span></button>
+      <button class="tb" id="btnLoad" title="Load JSON (Ctrl+O)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6h6l2 2h10v11H3z"/></svg><span class="lbl">Load JSON</span></button>
+      <button class="tb" id="btnSave" title="Save JSON (Ctrl+S)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M4 19h16"/></svg><span class="lbl">Save JSON</span></button>
+      <button class="tb" id="btnExample" title="Load an example diagram">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="12" r="5"/><circle cx="16" cy="12" r="5"/></svg><span class="lbl">Example</span></button>
+    </div>
+    <div class="group">
+      <button class="tb" id="btnTrace" title="Upload a picture of a flowchart to trace over">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></svg><span class="lbl">Trace image</span></button>
+      <button class="tb" id="btnClearTrace" title="Remove the background picture" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M9 9l6 6M15 9l-6 6"/></svg><span class="lbl">Clear image</span></button>
+    </div>
+    <div class="group">
+      <button class="tb" id="btnUndo" title="Undo (Ctrl+Z)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+      <button class="tb" id="btnRedo" title="Redo (Ctrl+Y)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
+    </div>
+    <div class="group">
+      <button class="tb" id="btnZoomOut" title="Zoom out">−</button>
+      <button class="tb" id="zoomLabel" title="Zoom to fit (F)">100%</button>
+      <button class="tb" id="btnZoomIn" title="Zoom in">+</button>
+    </div>
+    <input type="file" id="fileInput" accept=".json,application/json" hidden>
+    <input type="file" id="traceInput" accept="image/*" hidden>
+    <input type="file" id="itemImageInput" accept="image/*" hidden>
+  </header>
+
+  <!-- =================== CANVAS =================== -->
+  <main id="stage">
+    <svg id="canvas" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+      <defs>
+        <pattern id="gridPattern" width="20" height="20" patternUnits="userSpaceOnUse">
+          <path d="M20 0H0V20" fill="none" stroke="#e6e8ec" stroke-width="1"/>
+        </pattern>
+      </defs>
+      <g id="world">
+        <rect id="paper" x="0" y="0"/>
+        <image id="traceImg" x="0" y="0" preserveAspectRatio="xMidYMid meet" pointer-events="none" style="display:none"/>
+        <rect id="gridRect" x="0" y="0" fill="url(#gridPattern)" pointer-events="none"/>
+        <g id="shapesLayer"></g>
+        <g id="overlayLayer"></g>
+      </g>
+    </svg>
+    <div id="welcome" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+      <div class="welcome-box">
+        <h1 id="welcomeTitle">Welcome to Flow Chart Builder</h1>
+        <p>Build curved, ribbon-style flow diagrams that are hard to make in PowerPoint, Excel or Publisher.</p>
+        <ol>
+          <li><b>Arc</b>: click the center, then the start point, then the end point to draw a thick curved band.</li>
+          <li><b>Bézier</b>: click a start and an end point, then drag the two filled control points to make S-shapes and swoops.</li>
+          <li><b>Arrow</b>: click on a band, or near its end, to add a chevron that follows the curve.</li>
+          <li><b>Text</b> and <b>Circle</b>: add free labels and numbered badges such as ①.</li>
+          <li><b>Icon</b>: put an icon with a label inside a loop, such as a cloud with "Data". <b>Title</b>: add a heading and subtitle.</li>
+          <li>Click any shape, then use the panel on the right to change its <b>color</b>, <b>text</b> and size.</li>
+          <li><b>Save JSON</b> downloads your diagram. <b>Load JSON</b> opens it again later.</li>
+          <li><b>Snap it</b>: closes the gaps between your bands and joins them into one figure in a single color. Then click on it with <b>Arrow</b> wherever you want arrows. Each part between arrows becomes its own piece, with its own color and text.</li>
+          <li><b>Trace image</b>: upload a picture of a flowchart to show it behind the canvas and draw over it. <b>Clear image</b> removes it when you're done.</li>
+        </ol>
+        <p>Band ends snap together so pieces join cleanly. Click <b>Example</b> to see a finished diagram.</p>
+        <div class="go"><button id="welcomeStart">Get started</button><span>or press <kbd>Enter</kbd></span></div>
+      </div>
+    </div>
+    <div id="toast"></div>
+  </main>
+
+  <!-- =================== RIGHT PANEL =================== -->
+  <aside id="panel"></aside>
+
+  <!-- =================== STATUS BAR =================== -->
+  <footer id="status"><span id="hint"></span><span id="coords"></span></footer>
+</div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   Utilities
+   ===================================================================== */
+const NS = 'http://www.w3.org/2000/svg';
+const XLINK = 'http://www.w3.org/1999/xlink';
+const $ = sel => document.querySelector(sel);
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) if (attrs[k] != null) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const clone = o => JSON.parse(JSON.stringify(o));
+const rad = d => d * Math.PI / 180;
+const deg = r => r * 180 / Math.PI;
+const f = (n, p = 2) => { const m = 10 ** p; return Math.round(n * m) / m; };
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const norm = v => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
+const neg = v => [-v[0], -v[1]];
+const P = p => `${f(p[0])} ${f(p[1])}`;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+/** Shift angle a (degrees) by whole turns so it is within 180° of ref. */
+function unwrap(a, ref) { while (a - ref > 180) a -= 360; while (a - ref < -180) a += 360; return a; }
+
+/* =====================================================================
+   State / model
+   ===================================================================== */
+const APP_ID = 'FLOW-CHART-APP';
+const FILE_VERSION = 1;
+const AUTOSAVE_KEY = 'flow-chart-app:autosave';
+const SNAP_PX = 12;          // snap distance in screen pixels
+const END_SNAP_PX = 20;      // arrow tool: snap to band ends
+const PALETTE = ['#7B1E2B', '#5BA829', '#1F3F73', '#E0A526', '#8A8F99', '#2B8C8C', '#C2410C', '#6D28D9', '#1F2328', '#FFFFFF'];
+
+const DEFAULTS = {
+  arc: {
+    cx: 0, cy: 0, r: 100, startAngle: 180, endAngle: 360, thickness: 40,
+    fill: '#7B1E2B', text: '', textColor: '#FFFFFF', fontSize: 14, bold: true,
+    textOffset: 50, textAlign: 'center', flipText: false, opacity: 1
+  },
+  bezier: {
+    p0: [0, 0], p1: [50, -50], p2: [100, 50], p3: [150, 0], thickness: 40,
+    fill: '#5BA829', text: '', textColor: '#FFFFFF', fontSize: 14, bold: true,
+    textOffset: 50, textAlign: 'center', flipText: false, opacity: 1
+  },
+  arrow: {
+    parentId: null, t: 1, reverse: false, x: 0, y: 0, angle: 0,
+    style: 'chevron', width: 64, length: 32, fill: '#5BA829', opacity: 1
+  },
+  text: { x: 0, y: 0, text: 'Text', textColor: '#1F2328', fontSize: 24, bold: true, opacity: 1 },
+  circle: {
+    cx: 0, cy: 0, r: 16, fill: '#FFFFFF', stroke: '#333333', strokeWidth: 2,
+    text: '1', textColor: '#333333', fontSize: 16, bold: true, opacity: 1
+  },
+  // a "snapped figure": one continuous ribbon (center-line polyline) split into pieces by arrows (cuts)
+  path: {
+    points: [], closed: false, thickness: 40,
+    cuts: [],          // sorted positions in (0,1) along the ribbon where arrows sit
+    pieces: [],        // one style object per piece (see PIECE_DEFAULTS)
+    reverse: false, headArrow: false, tailArrow: false,
+    arrowStyle: 'chevron', arrowWidth: 64, arrowLength: 32, opacity: 1
+  },
+  // icon with a label under it (e.g. the "Data" cloud inside a loop); (x, y) is the center of the whole item.
+  // image: optional uploaded picture (data URL) used instead of the built-in icon
+  item: {
+    x: 0, y: 0, icon: 'cloud', image: null, iconSize: 56, iconColor: '#7B1E2B',
+    text: 'Label', textColor: '#7B1E2B', fontSize: 26, bold: true, gap: 6, opacity: 1
+  },
+  // title block: a heading with a smaller subtitle under it; (x, y) is the top of the block
+  title: {
+    x: 0, y: 0, title: 'Title', subtitle: 'Subtitle', titleColor: '#1F2328', subtitleColor: '#4B5563',
+    titleSize: 28, subtitleSize: 16, bold: true, align: 'left', opacity: 1
+  }
+};
+// layer: stacking order of pieces inside one figure (higher = drawn on top where the figure crosses itself)
+const PIECE_DEFAULTS = { fill: '#5BA829', text: '', textColor: '#FFFFFF', fontSize: 14, bold: true, textOffset: 50, textAlign: 'center', flipText: false, layer: 0 };
+const TYPE_NAMES = { arc: 'Arc band', bezier: 'Bézier band', arrow: 'Arrow', text: 'Text label', circle: 'Circle badge', path: 'Snapped figure', item: 'Icon + label', title: 'Title' };
+
+/* Built-in icons for the Icon tool: 24×24 line drawings in currentColor. */
+const ICONS = {
+  cloud:    { name: 'Cloud data', svg: '<path d="M7 15a4 4 0 0 1-.6-7.96A6 6 0 0 1 17.6 8.1 3.5 3.5 0 0 1 17.5 15z" fill="currentColor" stroke="none"/><path d="M8 15v3M12 15v4M16 15v3" stroke-width="1.5"/><circle cx="8" cy="19.2" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="20.6" r="1.3" fill="currentColor" stroke="none"/><circle cx="16" cy="19.2" r="1.3" fill="currentColor" stroke="none"/>' },
+  database: { name: 'Database', svg: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>' },
+  chip:     { name: 'AI chip', svg: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/><rect x="9.5" y="9.5" width="5" height="5" fill="currentColor" stroke="none"/>' },
+  network:  { name: 'Neural network', svg: '<path d="M5 6l7 6M5 18l7-6M12 12l7-6M12 12l7 6M5 6v12M19 6v12"/><circle cx="5" cy="6" r="2" fill="currentColor"/><circle cx="5" cy="18" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2.3" fill="currentColor"/><circle cx="19" cy="6" r="2" fill="currentColor"/><circle cx="19" cy="18" r="2" fill="currentColor"/>' },
+  code:     { name: 'Code', svg: '<path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/>' },
+  gears:    { name: 'Gears', svg: '<circle cx="9" cy="10" r="3"/><path d="M9 3.5v2M9 14.5v2M2.5 10h2M13.5 10h2M4.4 5.4l1.4 1.4M12.2 13.2l1.4 1.4M4.4 14.6l1.4-1.4M12.2 6.8l1.4-1.4"/><circle cx="17.5" cy="17.5" r="2"/><path d="M17.5 13.5V15M17.5 20v1.5M13.5 17.5H15M20 17.5h1.5"/>' },
+  chart:    { name: 'Chart', svg: '<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/>' },
+  monitor:  { name: 'Monitoring', svg: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M6 12l3-3 3 2 4-4"/>' },
+  rocket:   { name: 'Deploy', svg: '<path d="M12 2c4 2 6 6 6 10l-3 3H9l-3-3c0-4 2-8 6-10z"/><circle cx="12" cy="9" r="2"/><path d="M9 15l-3 5 4-2M15 15l3 5-4-2"/>' },
+  shield:   { name: 'Security', svg: '<path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>' },
+  bulb:     { name: 'Idea', svg: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>' },
+  users:    { name: 'People', svg: '<circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14a5 5 0 0 1 5 5"/>' },
+  search:   { name: 'Explore', svg: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/>' },
+  doc:      { name: 'Document', svg: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>' },
+  check:    { name: 'Test / check', svg: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>' },
+  loop:     { name: 'Cycle', svg: '<path d="M20 12a8 8 0 0 1-14 5.3M4 12a8 8 0 0 1 14-5.3"/><path d="M18 3v4h-4M6 21v-4h4"/>' }
+};
+const iconMarkup = key => `<g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${(ICONS[key] || ICONS.cloud).svg}</g>`;
+
+const state = {
+  canvas: { width: 1600, height: 900, background: '#FFFFFF' },
+  shapes: [],
+  selectedId: null,
+  selectedPiece: 0,      // which piece of a snapped figure is selected
+  tool: 'select',
+  nextId: 1,
+  dirty: false,
+  lastFill: '#5BA829',
+  showGrid: true,
+  trace: null            // { src: dataURL, name, opacity } — tracing aid only, never saved to JSON
+};
+const view = { x: 40, y: 40, k: 1 };
+
+const byId = id => state.shapes.find(s => s.id === id);
+const isBand = s => !!s && (s.type === 'arc' || s.type === 'bezier');
+/** Anything with a center line: arc, Bézier or snapped figure. */
+const isStrip = s => isBand(s) || (!!s && s.type === 'path');
+const isOpenStrip = s => isBand(s) || (!!s && s.type === 'path' && !s.closed);
+const arrowsOf = id => state.shapes.filter(a => a.type === 'arrow' && a.parentId === id);
+function makeShape(type, props) { return Object.assign({ id: null, type }, clone(DEFAULTS[type]), props); }
+function maxZ() { return state.shapes.reduce((m, s) => Math.max(m, s.z), -1); }
+function addShape(s) { s.id = 's' + (state.nextId++); s.z = maxZ() + 1; state.shapes.push(s); return s; }
+function normalizeZ() { [...state.shapes].sort((a, b) => a.z - b.z).forEach((s, i) => { s.z = i; }); }
+
+/* =====================================================================
+   Geometry
+   ===================================================================== */
+function sweep(s) { return clamp(s.endAngle - s.startAngle, -359.9, 359.9); }
+function arcThick(s) { return Math.min(s.thickness, 2 * s.r); }
+function bandThick(s) { return s.type === 'arc' ? arcThick(s) : s.thickness; }
+function arcAngleAt(s, t) { return rad(s.startAngle + sweep(s) * t); }
+
+function bezAt(s, t) {
+  const u = 1 - t, a = s.p0, b = s.p1, c = s.p2, d = s.p3;
+  return [0, 1].map(i => u * u * u * a[i] + 3 * u * u * t * b[i] + 3 * u * t * t * c[i] + t * t * t * d[i]);
+}
+function bezDeriv(s, t) {
+  const u = 1 - t, a = s.p0, b = s.p1, c = s.p2, d = s.p3;
+  return [0, 1].map(i => 3 * u * u * (b[i] - a[i]) + 6 * u * t * (c[i] - b[i]) + 3 * t * t * (d[i] - c[i]));
+}
+/** Point on a band's center line at t ∈ [0,1]. */
+function shapePoint(s, t) {
+  if (s.type === 'arc') { const a = arcAngleAt(s, t); return [s.cx + s.r * Math.cos(a), s.cy + s.r * Math.sin(a)]; }
+  if (s.type === 'path') return geoAt(pathGeo(s), t);
+  return bezAt(s, t);
+}
+/** Unit tangent (direction of travel) at t. */
+function shapeTangent(s, t) {
+  if (s.type === 'path') return geoTangent(pathGeo(s), t, s.closed);
+  if (s.type === 'arc') {
+    const a = arcAngleAt(s, t), sg = sweep(s) >= 0 ? 1 : -1;
+    return [-Math.sin(a) * sg, Math.cos(a) * sg];
+  }
+  let d = bezDeriv(s, t);
+  if (Math.hypot(d[0], d[1]) < 1e-6) d = bezDeriv(s, t < 0.5 ? t + 0.01 : t - 0.01);
+  if (Math.hypot(d[0], d[1]) < 1e-6) d = [s.p3[0] - s.p0[0], s.p3[1] - s.p0[1]];
+  return norm(d);
+}
+function nearestOnBand(s, p) {
+  if (s.type === 'path') return nearestOnPath(s, p);
+  let best = { t: 0, d: Infinity, pt: null };
+  for (let i = 0; i <= 100; i++) {
+    const t = i / 100, q = shapePoint(s, t), d = dist(q, p);
+    if (d < best.d) best = { t, d, pt: q };
+  }
+  const t0 = best.t;
+  for (let i = -10; i <= 10; i++) {
+    const t = clamp(t0 + i / 1000, 0, 1), q = shapePoint(s, t), d = dist(q, p);
+    if (d < best.d) best = { t, d, pt: q };
+  }
+  return best;
+}
+
+function arcBandPath(s) {
+  const sw = sweep(s), th = arcThick(s);
+  const a0 = rad(s.startAngle), a1 = rad(s.startAngle + sw);
+  const ro = s.r + th / 2, ri = Math.max(0, s.r - th / 2);
+  const large = Math.abs(sw) > 180 ? 1 : 0, sf = sw >= 0 ? 1 : 0;
+  const at = (r, a) => P([s.cx + r * Math.cos(a), s.cy + r * Math.sin(a)]);
+  return `M ${at(ro, a0)} A ${f(ro)} ${f(ro)} 0 ${large} ${sf} ${at(ro, a1)} ` +
+         `L ${at(ri, a1)} A ${f(ri)} ${f(ri)} 0 ${large} ${1 - sf} ${at(ri, a0)} Z`;
+}
+function arcLinePath(s, reverse) {
+  const sw = sweep(s);
+  let a0 = rad(s.startAngle), a1 = rad(s.startAngle + sw), sf = sw >= 0 ? 1 : 0;
+  if (reverse) { [a0, a1] = [a1, a0]; sf = 1 - sf; }
+  const large = Math.abs(sw) > 180 ? 1 : 0;
+  const at = a => P([s.cx + s.r * Math.cos(a), s.cy + s.r * Math.sin(a)]);
+  return `M ${at(a0)} A ${f(s.r)} ${f(s.r)} 0 ${large} ${sf} ${at(a1)}`;
+}
+function bezLinePath(s, reverse) {
+  const [a, b, c, d] = reverse ? [s.p3, s.p2, s.p1, s.p0] : [s.p0, s.p1, s.p2, s.p3];
+  return `M ${P(a)} C ${P(b)} ${P(c)} ${P(d)}`;
+}
+function bezOutlinePath(s) {
+  const h = s.thickness / 2, L = [], R = [];
+  for (let i = 0; i <= 48; i++) {
+    const t = i / 48, p = bezAt(s, t), T = shapeTangent(s, t), N = [-T[1], T[0]];
+    L.push([p[0] + N[0] * h, p[1] + N[1] * h]);
+    R.push([p[0] - N[0] * h, p[1] - N[1] * h]);
+  }
+  return 'M ' + L.map(P).join(' L ') + ' L ' + R.reverse().map(P).join(' L ') + ' Z';
+}
+/** Pick a text direction so labels are not upside-down. */
+function autoFlip(s) {
+  if (s.type === 'arc') {
+    const sw = sweep(s), mid = ((s.startAngle + sw / 2) % 360 + 360) % 360;
+    const bottom = mid > 0 && mid < 180;
+    return sw >= 0 ? bottom : !bottom;
+  }
+  if (s.type === 'bezier') return s.p3[0] < s.p0[0];
+  return false;
+}
+function bezierFrom(p0, d0, p3, d3) {
+  const d = [p3[0] - p0[0], p3[1] - p0[1]], L = Math.hypot(d[0], d[1]) || 1;
+  const n = [-d[1] / L, d[0] / L];
+  const p1 = d0 ? [p0[0] + d0[0] * L / 3, p0[1] + d0[1] * L / 3]
+                : [p0[0] + d[0] / 3 + n[0] * L * 0.3, p0[1] + d[1] / 3 + n[1] * L * 0.3];
+  const p2 = d3 ? [p3[0] + d3[0] * L / 3, p3[1] + d3[1] * L / 3]
+                : [p0[0] + 2 * d[0] / 3 - n[0] * L * 0.3, p0[1] + 2 * d[1] / 3 - n[1] * L * 0.3];
+  return { p0: p0.map(v => f(v)), p1: p1.map(v => f(v)), p2: p2.map(v => f(v)), p3: p3.map(v => f(v)) };
+}
+
+/* ---------- Snapped-figure (path) geometry ----------
+   A path stores its center line as a flat [x,y,x,y,…] list. Positions along it are
+   fractions s ∈ [0,1] of its total length. */
+const geoCache = new WeakMap();
+function pathGeo(s) {
+  let g = geoCache.get(s.points);
+  if (g) return g;
+  const pts = [];
+  for (let i = 0; i + 1 < s.points.length; i += 2) pts.push([s.points[i], s.points[i + 1]]);
+  if (s.closed && pts.length) pts.push(pts[0]);
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + dist(pts[i - 1], pts[i]));
+  g = { pts, cum, L: cum[cum.length - 1] || 1 };
+  geoCache.set(s.points, g);
+  return g;
+}
+function geoAt(g, s) {
+  const target = clamp(s, 0, 1) * g.L, c = g.cum;
+  let lo = 0, hi = c.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (c[m] <= target) lo = m; else hi = m; }
+  const seg = c[hi] - c[lo] || 1, u = clamp((target - c[lo]) / seg, 0, 1), a = g.pts[lo], b = g.pts[hi];
+  return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+}
+function geoTangent(g, s, closed) {
+  const h = 3 / g.L;
+  let a = s - h, b = s + h;
+  if (closed) { a = (a + 1) % 1; b = b % 1; } else { a = Math.max(0, a); b = Math.min(1, b); }
+  const p = geoAt(g, a), q = geoAt(g, b);
+  return norm([q[0] - p[0], q[1] - p[1]]);
+}
+/** Points of the center line between positions a < b (b may exceed 1 on a closed loop = wrap). */
+function subPts(g, a, b) {
+  if (b > 1) return subPts(g, a, 1).concat(subPts(g, 0, b - 1).slice(1));
+  const ta = a * g.L, tb = b * g.L, out = [geoAt(g, a)];
+  for (let k = 0; k < g.pts.length; k++) if (g.cum[k] > ta && g.cum[k] < tb) out.push(g.pts[k]);
+  out.push(geoAt(g, b));
+  return out;
+}
+const polyD = (pts, close) => 'M ' + pts.map(P).join(' L ') + (close ? ' Z' : '');
+/** [start, end] of every piece. On a closed loop the last piece wraps (end > 1). */
+function pieceRanges(s) {
+  const c = s.cuts;
+  if (!s.closed) { const b = [0, ...c, 1]; return b.slice(0, -1).map((v, i) => [v, b[i + 1]]); }
+  if (!c.length) return [[0, 1]];
+  return c.map((v, i) => (i < c.length - 1 ? [v, c[i + 1]] : [v, c[0] + 1]));
+}
+function pieceAt(s, pos) {
+  const n = s.cuts.length, k = s.cuts.filter(x => x < pos).length;
+  if (!s.closed) return k;
+  if (!n) return 0;
+  return k === 0 ? n - 1 : k - 1;
+}
+function nearestOnPath(s, p) {
+  const g = pathGeo(s);
+  let best = { t: 0, d: Infinity, pt: g.pts[0] };
+  for (let i = 1; i < g.pts.length; i++) {
+    const a = g.pts[i - 1], b = g.pts[i], ab = [b[0] - a[0], b[1] - a[1]], l2 = ab[0] * ab[0] + ab[1] * ab[1] || 1;
+    const u = clamp(((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / l2, 0, 1);
+    const q = [a[0] + ab[0] * u, a[1] + ab[1] * u], d = dist(q, p);
+    if (d < best.d) best = { t: (g.cum[i - 1] + (g.cum[i] - g.cum[i - 1]) * u) / g.L, d, pt: q };
+  }
+  if (s.closed && best.t >= 1) best.t = 0;
+  return best;
+}
+/** Add an arrow (cut) at position c, splitting the piece there. Returns the index of the piece that now starts at c, or -1. */
+function insertCut(s, c) {
+  const minGap = 8 / pathGeo(s).L;
+  if (!s.closed && (c < minGap || c > 1 - minGap)) return -1;
+  if (s.cuts.some(x => Math.abs(x - c) < minGap || (s.closed && 1 - Math.abs(x - c) < minGap))) return -1;
+  const n = s.cuts.length, k = s.cuts.filter(x => x < c).length;
+  const split = pieceAt(s, c);
+  const copy = Object.assign(clone(s.pieces[split]), { text: '' });
+  s.cuts.splice(k, 0, f(c, 5));
+  if (!s.closed) { s.pieces.splice(k + 1, 0, copy); return k + 1; }
+  if (n === 0) return 0;                       // a loop's first cut just opens it at c
+  if (k === 0) s.pieces.unshift(copy);
+  else if (k === n) s.pieces.push(copy);
+  else s.pieces.splice(k, 0, copy);
+  return k;
+}
+/** Remove arrow i, merging the two pieces either side of it. */
+function removeCut(s, i) {
+  const n = s.cuts.length;
+  if (i < 0 || i >= n) return;
+  s.cuts.splice(i, 1);
+  if (!s.closed) s.pieces.splice(i + 1, 1);
+  else if (n > 1) s.pieces.splice(i, 1);
+}
+
+/* ---------- Snap it: join bands into continuous figures ---------- */
+const sub2 = (a, b) => [a[0] - b[0], a[1] - b[1]];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1];
+function sampleStrip(s, reverse) {
+  let pts;
+  if (s.type === 'path') pts = pathGeo(s).pts.slice();
+  else {
+    let L = 0, prev = shapePoint(s, 0);
+    for (let i = 1; i <= 64; i++) { const q = shapePoint(s, i / 64); L += dist(prev, q); prev = q; }
+    const n = Math.max(8, Math.ceil(L / 3));
+    pts = [];
+    for (let i = 0; i <= n; i++) pts.push(shapePoint(s, i / n));
+  }
+  return reverse ? pts.reverse() : pts;
+}
+function walkBack(A, i, len) { let acc = 0; while (i > 1 && acc < len) { acc += dist(A[i], A[i - 1]); i--; } return i; }
+function walkFwd(B, j, len) { let acc = 0; while (j < B.length - 2 && acc < len) { acc += dist(B[j], B[j + 1]); j++; } return j; }
+/** Smooth cubic bridge from a (heading dA) to b (heading dB). Interior points only. */
+function bridgePts(a, dA, b, dB) {
+  const d = dist(a, b);
+  if (d < 1) return [];
+  const k = d * 0.4, p1 = [a[0] + dA[0] * k, a[1] + dA[1] * k], p2 = [b[0] - dB[0] * k, b[1] - dB[1] * k];
+  const n = Math.max(2, Math.ceil(d / 3)), out = [];
+  for (let i = 1; i < n; i++) {
+    const t = i / n, u = 1 - t;
+    out.push([0, 1].map(c => u * u * u * a[c] + 3 * u * u * t * p1[c] + 3 * u * t * t * p2[c] + t * t * t * b[c]));
+  }
+  return out;
+}
+/** Where to join the tail of A to the head of B: trims overlaps/crossings, keeps gaps. */
+function joinPoint(A, B, th, win) {
+  let iStart = A.length - 1, acc = 0;
+  while (iStart > 0 && acc < win) { acc += dist(A[iStart], A[iStart - 1]); iStart--; }
+  let jEnd = 0; acc = 0;
+  while (jEnd < B.length - 1 && acc < win) { acc += dist(B[jEnd], B[jEnd + 1]); jEnd++; }
+  let bi = A.length - 1, bj = 0, bd = dist(A[bi], B[0]);
+  for (let i = iStart; i < A.length; i++) for (let j = 0; j <= jEnd; j++) {
+    const d = dist(A[i], B[j]);
+    if (d < bd - 0.5) { bd = d; bi = i; bj = j; }
+  }
+  const trimmed = bi < A.length - 1 || bj > 0, gap = trimmed || bd > 1;
+  // step back from the join on both sides so the bridge can make a smooth curve instead of a hook
+  if (gap) { const back = th * (trimmed ? 0.6 : 0.5) + bd * 0.5; bi = walkBack(A, bi, back); bj = walkFwd(B, bj, back); }
+  bi = Math.max(1, bi); bj = Math.min(B.length - 2, bj);
+  return { i: bi, j: bj, gap };
+}
+function joinBridge(A, i, B, j) {
+  const dA = norm(sub2(A[i], A[i - 1])), dB = norm(sub2(B[j + 1], B[j]));
+  return bridgePts(A[i], dA, B[j], dB);
+}
+function resample(pts, step, closed) {
+  const src = closed ? pts.concat([pts[0]]) : pts, out = [src[0]];
+  let carry = 0;
+  for (let i = 1; i < src.length; i++) {
+    const a = src[i - 1], b = src[i], L = dist(a, b);
+    let pos = step - carry;
+    while (pos <= L) { const u = pos / L; out.push([a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]); pos += step; }
+    carry = L - (pos - step);
+  }
+  if (closed) { if (dist(out[out.length - 1], out[0]) < step * 0.5) out.pop(); }
+  else if (dist(out[out.length - 1], src[src.length - 1]) > 0.5) out.push(src[src.length - 1]);
+  return out;
+}
+
+function snapIt() {
+  const strips = state.shapes.filter(isOpenStrip);
+  if (!strips.length) { toast('Draw some arcs or Bézier bands first, then click Snap it.', true); return; }
+  const th = Math.max(...strips.map(bandThick)), tol = th * 3;
+
+  // 1. every strip has two ends; pair up ends that face each other within the tolerance
+  const ends = [];
+  strips.forEach((s, i) => {
+    ends.push({ i, end: 0, p: shapePoint(s, 0), d: neg(shapeTangent(s, 0)) });
+    ends.push({ i, end: 1, p: shapePoint(s, 1), d: shapeTangent(s, 1) });
+  });
+  const pairs = [];
+  for (let a = 0; a < ends.length; a++) for (let b = a + 1; b < ends.length; b++) {
+    const A = ends[a], B = ends[b], same = A.i === B.i;
+    const d = dist(A.p, B.p), dd = dot(A.d, B.d);
+    if (d > tol || dd > 0.7) continue;                       // too far, or a hairpin
+    if (same && d > th * 1.5 && sampleStrip(strips[A.i]).length < (th * 4) / 3) continue;
+    pairs.push({ a: A, b: B, score: d + ((1 + dd) / 2) * tol + (same ? tol * 0.5 : 0) });
+  }
+  pairs.sort((x, y) => x.score - y.score);
+  const key = e => e.i + ':' + e.end, link = new Map();
+  for (const pr of pairs) {
+    if (link.has(key(pr.a)) || link.has(key(pr.b))) continue;
+    link.set(key(pr.a), pr.b); link.set(key(pr.b), pr.a);
+  }
+
+  // 2. walk the links into chains (open chains first, then loops)
+  const visited = new Set(), chains = [];
+  const walk = (start, entry) => {
+    const seq = []; let cur = start, ent = entry, closed = false;
+    for (;;) {
+      seq.push({ i: cur, reverse: ent === 1 });
+      visited.add(cur);
+      const nxt = link.get(cur + ':' + (1 - ent));
+      if (!nxt) break;
+      if (visited.has(nxt.i)) { closed = nxt.i === start; break; }
+      cur = nxt.i; ent = nxt.end;
+    }
+    chains.push({ seq, closed });
+  };
+  strips.forEach((s, i) => {
+    if (visited.has(i)) return;
+    if (!link.has(i + ':0')) walk(i, 0); else if (!link.has(i + ':1')) walk(i, 1);
+  });
+  strips.forEach((s, i) => { if (!visited.has(i)) walk(i, 0); });
+
+  // 3. remember where the existing arrows are, so they come back as arrows on the new figure
+  const markersOf = s => {
+    const out = [];
+    if (isBand(s)) arrowsOf(s.id).forEach(a => { const fr = arrowFrame(a); if (fr) out.push(fr); });
+    else {
+      const g = pathGeo(s);
+      s.cuts.forEach(c => { const T = geoTangent(g, c, false); out.push({ p: geoAt(g, c), T: s.reverse ? neg(T) : T }); });
+      if (s.headArrow) out.push({ p: geoAt(g, 1), T: geoTangent(g, 1, false), end: true });
+      if (s.tailArrow) out.push({ p: geoAt(g, 0), T: neg(geoTangent(g, 0, false)), end: true });
+    }
+    return out;
+  };
+
+  // 4. build one continuous center line per chain, bridging gaps and trimming overlaps
+  let gaps = 0;
+  const made = [], removed = new Set();
+  const zMin = Math.min(...strips.map(s => s.z));
+  for (const ch of chains) {
+    let pts = null;
+    for (const { i, reverse } of ch.seq) {
+      const q = sampleStrip(strips[i], reverse);
+      if (!pts) { pts = q; continue; }
+      const jp = joinPoint(pts, q, th, th * 2.5);
+      if (jp.gap) gaps++;
+      pts = pts.slice(0, jp.i + 1).concat(joinBridge(pts, jp.i, q, jp.j), q.slice(jp.j));
+    }
+    if (ch.closed) {
+      let L = 0;
+      for (let k = 1; k < pts.length; k++) L += dist(pts[k - 1], pts[k]);
+      const jp = joinPoint(pts, pts, th, Math.min(th * 2.5, L / 4));
+      if (jp.gap) gaps++;
+      pts = pts.slice(jp.j, jp.i + 1).concat(joinBridge(pts, jp.i, pts, jp.j));
+    }
+    pts = resample(pts, 3, ch.closed);
+    if (pts.length < 2) continue;
+
+    const first = strips[ch.seq[0].i];
+    const fill = first.type === 'path' ? first.pieces[0].fill : first.fill;
+    const np = makeShape('path', {
+      points: pts.flatMap(p => [f(p[0], 1), f(p[1], 1)]), closed: ch.closed,
+      thickness: f(th), arrowWidth: f(th * 1.6), arrowLength: f(th * 0.8),
+      pieces: [Object.assign(clone(PIECE_DEFAULTS), { fill })]
+    });
+
+    // re-create arrows as cuts; point them the way most old arrows pointed
+    const marks = ch.seq.flatMap(({ i }) => markersOf(strips[i]))
+      .map(m => Object.assign(m, nearestOnPath(np, m.p)));
+    let back = 0;
+    marks.forEach(m => { if (dot(m.T, shapeTangent(np, m.t)) < 0) back++; });
+    np.reverse = marks.length > 0 && back > marks.length / 2;
+    const L = pathGeo(np).L, endLim = th / L;
+    for (const m of marks) {
+      if (!np.closed && m.t < endLim) np.tailArrow = true;
+      else if (!np.closed && m.t > 1 - endLim) np.headArrow = true;
+      else insertCut(np, m.t);
+    }
+    for (const { i } of ch.seq) {
+      removed.add(strips[i].id);
+      if (isBand(strips[i])) arrowsOf(strips[i].id).forEach(a => removed.add(a.id));
+    }
+    made.push(np);
+  }
+
+  state.shapes = state.shapes.filter(s => !removed.has(s.id));
+  made.forEach(np => { addShape(np); np.z = zMin - 0.5; });
+  normalizeZ();
+  state.selectedId = made.length ? made[0].id : null;
+  state.selectedPiece = 0;
+  setTool('select');
+  render(); buildPanel(); commit();
+  toast(`Snapped ${strips.length} band(s) into ${made.length} figure(s)` + (gaps ? `, closing ${gaps} gap(s)/overlap(s)` : '') +
+        '. Use the Arrow tool on the figure to split it into pieces.');
+}
+
+/** Position + unit direction of an arrow (attached or free). */
+function arrowFrame(a) {
+  let p, T;
+  if (a.parentId) {
+    const par = byId(a.parentId);
+    if (!isBand(par)) return null;
+    p = shapePoint(par, a.t); T = shapeTangent(par, a.t);
+  } else {
+    p = [a.x, a.y]; T = [Math.cos(rad(a.angle)), Math.sin(rad(a.angle))];
+  }
+  if (a.reverse) T = neg(T);
+  return { p, T };
+}
+function arrowPoints(a) {
+  const fr = arrowFrame(a);
+  return fr ? chevronPoints(fr.p, fr.T, a.style, a.width, a.length) : null;
+}
+/** Arrowhead polygon at p pointing along unit vector T. */
+function chevronPoints(p, T, style, width, length) {
+  const N = [-T[1], T[0]], w = width / 2, L = length;
+  const at = (t, n) => [p[0] + T[0] * t + N[0] * n, p[1] + T[1] * t + N[1] * n];
+  switch (style) {
+    case 'triangle':   return [at(0, w), at(L, 0), at(0, -w)];
+    case 'notch-tail': return [at(-1, w), at(L, 0), at(-1, -w)];
+    case 'gap':        return [at(0, w), at(L, 0), at(0, -w)];   // drawn as a thin V line (see drawHead)
+    default: {         // chevron: swept-back barbs that blend into the band
+      const h = w / 1.6, back = L * 0.45;
+      return [at(-back, h), at(-back, w), at(L, 0), at(-back, -w), at(-back, -h)];
+    }
+  }
+}
+
+/** Default arrowhead size for a style, relative to the band thickness. */
+function headSize(style, th) {
+  if (style === 'notch-tail') return { w: f(th + 2), l: f(th * 0.5) };
+  if (style === 'gap') return { w: f(th + 4), l: f(th * 0.35) };
+  return { w: f(th * 1.6), l: f(th * 0.8) };
+}
+/** Draw an arrowhead. 'gap' is a thin V cut in the background color; the others are solid shapes. */
+function drawHead(parent, pts, style, fill, width, attrs = {}, fillPoint = false) {
+  const points = pts.map(q => `${f(q[0])},${f(q[1])}`).join(' ');
+  if (style === 'gap') {
+    // on a snapped figure the piece before the cut ends in a point: fill the inside of the V with its color
+    if (fillPoint) el('polygon', Object.assign({ points, fill, stroke: fill, 'stroke-width': 1 }, attrs), parent);
+    return el('polyline', Object.assign({
+      points, fill: 'none', stroke: state.canvas.background, 'stroke-width': f(Math.max(2, width * 0.07)),
+      'stroke-linejoin': 'miter', 'stroke-miterlimit': 10, 'stroke-linecap': 'butt'
+    }, attrs), parent);
+  }
+  return el('polygon', Object.assign({ points, fill: style === 'notch-tail' ? state.canvas.background : fill }, attrs), parent);
+}
+const ARROW_STYLE_OPTIONS = '<option value="chevron">Chevron</option><option value="triangle">Triangle</option>' +
+  '<option value="notch-tail">Notch (cut-in)</option><option value="gap">Thin chevron cut</option>';
+
+/* =====================================================================
+   Snapping
+   ===================================================================== */
+let snapMark = null;
+function snapCandidates(kind, excludeId) {
+  const out = [];
+  for (const s of state.shapes) {
+    if (s.id === excludeId) continue;
+    if (kind === 'end' && isOpenStrip(s)) {
+      out.push({ pt: shapePoint(s, 0), dir: neg(shapeTangent(s, 0)) });
+      out.push({ pt: shapePoint(s, 1), dir: shapeTangent(s, 1) });
+    }
+    if (kind === 'center' && (s.type === 'arc' || s.type === 'circle')) out.push({ pt: [s.cx, s.cy] });
+  }
+  return out;
+}
+/** Snap a point to nearby band ends ('end') or arc/circle centers ('center'). Alt disables. */
+function snap(p, kind, excludeId, e) {
+  if (e && e.altKey) return { pt: p };
+  let best = null, bd = SNAP_PX / view.k;
+  for (const c of snapCandidates(kind, excludeId)) {
+    const d = dist(c.pt, p);
+    if (d < bd) { bd = d; best = c; }
+  }
+  if (!best) return { pt: p };
+  snapMark = best.pt;
+  return { pt: [...best.pt], dir: best.dir, snapped: true };
+}
+
+function translateShape(s, o, dx, dy) {
+  switch (s.type) {
+    case 'arc': case 'circle': s.cx = f(o.cx + dx); s.cy = f(o.cy + dy); break;
+    case 'bezier': for (const k of ['p0', 'p1', 'p2', 'p3']) s[k] = [f(o[k][0] + dx), f(o[k][1] + dy)]; break;
+    case 'text': s.x = f(o.x + dx); s.y = f(o.y + dy); break;
+    case 'arrow': if (!s.parentId) { s.x = f(o.x + dx); s.y = f(o.y + dy); } break;
+    case 'path': s.points = o.points.map((v, i) => f(v + (i % 2 ? dy : dx), 1)); break;
+    case 'item': case 'title': s.x = f(o.x + dx); s.y = f(o.y + dy); break;
+  }
+}
+function moveWithSnap(s, o, dx, dy, e) {
+  translateShape(s, o, dx, dy);
+  if (e.altKey || !(isBand(s) || s.type === 'circle')) return;
+  const mine = [];
+  if (isBand(s)) mine.push({ pt: shapePoint(s, 0), kind: 'end' }, { pt: shapePoint(s, 1), kind: 'end' });
+  if (s.type === 'arc' || s.type === 'circle') mine.push({ pt: [s.cx, s.cy], kind: 'center' });
+  let best = null, bd = SNAP_PX / view.k;
+  for (const m of mine) for (const c of snapCandidates(m.kind, s.id)) {
+    const d = dist(m.pt, c.pt);
+    if (d < bd) { bd = d; best = { off: [c.pt[0] - m.pt[0], c.pt[1] - m.pt[1]], pt: c.pt }; }
+  }
+  if (best) { translateShape(s, o, dx + best.off[0], dy + best.off[1]); snapMark = best.pt; }
+}
+
+/* =====================================================================
+   Rendering
+   ===================================================================== */
+const svg = $('#canvas'), world = $('#world'), shapesLayer = $('#shapesLayer'), overlay = $('#overlayLayer');
+const panel = $('#panel');
+
+/**
+ * Text along a band. s.textAlign: 'center' (placed by textOffset %), or 'start' / 'end' to pin the
+ * label to that edge of the band (in flow direction). o.flipped: the label path runs backwards.
+ * o.padStart / o.padEnd: room to leave at each edge (e.g. for arrowheads).
+ */
+function addLabel(g, s, d, id = 'cl-' + s.id, o = {}) {
+  if (!s.text) return;
+  el('path', { id, d, fill: 'none', stroke: 'none' }, g);
+  let align = s.textAlign === 'start' || s.textAlign === 'end' ? s.textAlign : 'center';
+  let padS = o.padStart ?? 10, padE = o.padEnd ?? 10;
+  if (o.flipped) {        // the path is reversed, so the flow's start edge is the path's end
+    if (align !== 'center') align = align === 'start' ? 'end' : 'start';
+    [padS, padE] = [padE, padS];
+  }
+  const t = el('text', {
+    fill: s.textColor, 'font-size': s.fontSize, 'font-weight': s.bold ? 700 : 400,
+    'letter-spacing': f(s.fontSize * 0.08), 'text-anchor': align === 'center' ? 'middle' : align, 'dominant-baseline': 'central',
+    'pointer-events': 'none', class: 'band-label', 'data-fs': s.fontSize, 'data-path': id,
+    'data-align': align, 'data-pad-s': f(padS), 'data-pad-e': f(padE)
+  }, g);
+  // start/end offsets need the path length, so fitTexts() sets them after the path is in the page
+  const tp = el('textPath', { href: '#' + id, startOffset: align === 'center' ? s.textOffset + '%' : 0 }, t);
+  tp.setAttributeNS(XLINK, 'xlink:href', '#' + id);
+  tp.textContent = s.text;
+}
+
+function renderShape(s) {
+  const g = el('g', { class: 'shape', 'data-id': s.id, opacity: s.opacity });
+  switch (s.type) {
+    case 'arc':
+      el('path', { d: arcBandPath(s), fill: s.fill }, g);
+      addLabel(g, s, arcLinePath(s, s.flipText), undefined, { flipped: s.flipText });
+      break;
+    case 'bezier':
+      el('path', { d: bezLinePath(s, false), fill: 'none', stroke: s.fill, 'stroke-width': s.thickness, 'stroke-linecap': 'butt' }, g);
+      addLabel(g, s, bezLinePath(s, s.flipText), undefined, { flipped: s.flipText });
+      break;
+    case 'arrow': {
+      const pts = arrowPoints(s);
+      if (pts) drawHead(g, pts, s.style, s.fill, s.width);
+      break;
+    }
+    case 'text': {
+      const empty = !String(s.text).trim();
+      const t = el('text', {
+        x: s.x, y: s.y, fill: empty ? '#9CA3AF' : s.textColor, 'font-size': s.fontSize,
+        'font-weight': s.bold ? 700 : 400, 'text-anchor': 'middle', 'dominant-baseline': 'central'
+      }, g);
+      const lines = empty ? ['(empty text)'] : String(s.text).split('\n');
+      lines.forEach((ln, i) => {
+        const ts = el('tspan', { x: s.x, dy: i === 0 ? f(-(lines.length - 1) * 0.6 * s.fontSize) : f(1.2 * s.fontSize) }, t);
+        ts.textContent = ln || ' ';
+      });
+      g.classList.add('hit-box');
+      break;
+    }
+    case 'item': renderItem(s, g); break;
+    case 'title': renderTitle(s, g); break;
+    case 'circle':
+      el('circle', { cx: s.cx, cy: s.cy, r: s.r, fill: s.fill, stroke: s.stroke, 'stroke-width': s.strokeWidth }, g);
+      if (s.text) {
+        const t = el('text', {
+          x: s.cx, y: s.cy, fill: s.textColor, 'font-size': s.fontSize, 'font-weight': s.bold ? 700 : 400,
+          'text-anchor': 'middle', 'dominant-baseline': 'central', 'pointer-events': 'none'
+        }, g);
+        t.textContent = s.text;
+      }
+      break;
+    case 'path': renderPath(s, g); break;
+  }
+  return g;
+}
+
+function renderItem(s, g) {
+  const hasIcon = !!(s.image || s.icon), hasText = !!String(s.text).trim();
+  const sz = s.iconSize, H = (hasIcon ? sz : 0) + (hasIcon && hasText ? s.gap : 0) + (hasText ? s.fontSize * 1.2 : 0);
+  const top = s.y - H / 2;
+  if (s.image) {
+    const im = el('image', { x: f(s.x - sz / 2), y: f(top), width: sz, height: sz, preserveAspectRatio: 'xMidYMid meet' }, g);
+    im.setAttribute('href', s.image);
+    im.setAttributeNS(XLINK, 'xlink:href', s.image);
+  } else if (s.icon) {
+    const ic = el('svg', { x: f(s.x - sz / 2), y: f(top), width: sz, height: sz, viewBox: '0 0 24 24', overflow: 'visible' }, g);
+    ic.style.color = s.iconColor;
+    ic.innerHTML = iconMarkup(s.icon);
+  }
+  if (hasText) {
+    const t = el('text', {
+      x: s.x, y: f(top + (hasIcon ? sz + s.gap : 0) + s.fontSize * 0.6), fill: s.textColor, 'font-size': s.fontSize,
+      'font-weight': s.bold ? 700 : 400, 'text-anchor': 'middle', 'dominant-baseline': 'central'
+    }, g);
+    t.textContent = s.text;
+  }
+  g.classList.add('hit-box');
+}
+function renderTitle(s, g) {
+  const anchor = { left: 'start', center: 'middle', right: 'end' }[s.align] || 'start';
+  const base = s.y + s.titleSize * 0.85;
+  const t = el('text', { x: s.x, y: f(base), fill: s.titleColor, 'font-size': s.titleSize, 'font-weight': s.bold ? 700 : 400, 'text-anchor': anchor }, g);
+  t.textContent = s.title || ' ';
+  if (String(s.subtitle).trim()) {
+    const st = el('text', { x: s.x, y: f(base + s.subtitleSize * 1.4), fill: s.subtitleColor, 'font-size': s.subtitleSize, 'text-anchor': anchor }, g);
+    st.textContent = s.subtitle;
+  }
+  g.classList.add('hit-box');
+}
+/** Text-only shapes are hard to click between letters: give them an invisible box that catches clicks. */
+function addHitBoxes(root) {
+  root.querySelectorAll('g.hit-box').forEach(g => {
+    try {
+      const b = g.getBBox();
+      const r = el('rect', { x: b.x - 4, y: b.y - 4, width: b.width + 8, height: b.height + 8, fill: '#fff', 'fill-opacity': 0 });
+      g.insertBefore(r, g.firstChild);
+    } catch (_) { /* not measurable */ }
+  });
+}
+
+function pathArrowList(s) {
+  // [{pos, T, piece, into}] for every arrowhead on a snapped figure.
+  // piece = the piece the arrow belongs to (its color); into = the piece its tip points into.
+  const g = pathGeo(s), n = s.cuts.length, out = [];
+  s.cuts.forEach((c, i) => {
+    const T = geoTangent(g, c, s.closed);
+    const before = s.closed ? (i - 1 + n) % n : i, after = s.closed ? i : i + 1;
+    if (!s.reverse) out.push({ pos: c, T, piece: before, into: after });
+    else out.push({ pos: c, T: neg(T), piece: after, into: before });
+  });
+  const last = s.pieces.length - 1;
+  if (!s.closed && s.headArrow) out.push({ pos: 1, T: geoTangent(g, 1, false), piece: last, into: last });
+  if (!s.closed && s.tailArrow) out.push({ pos: 0, T: neg(geoTangent(g, 0, false)), piece: 0, into: 0 });
+  return out;
+}
+const pieceLayer = (s, i) => (s.pieces[i] && s.pieces[i].layer) || 0;
+function renderPath(s, g) {
+  const geo = pathGeo(s), whole = s.closed && !s.cuts.length;
+  // draw layer by layer: each layer's pieces, then the arrows that sit on that layer, so a piece
+  // brought to the front covers the pieces it crosses
+  const layers = new Map(), slot = L => { if (!layers.has(L)) layers.set(L, { pieces: [], arrows: [] }); return layers.get(L); };
+  pieceRanges(s).forEach((r, i) => slot(pieceLayer(s, i)).pieces.push([r, i]));
+  for (const a of pathArrowList(s)) slot(Math.max(pieceLayer(s, a.piece), pieceLayer(s, a.into))).arrows.push(a);
+  for (const L of [...layers.keys()].sort((a, b) => a - b)) {
+    const { pieces, arrows } = layers.get(L);
+    for (const [r, i] of pieces) {
+      const pc = s.pieces[i] || s.pieces[0], pts = subPts(geo, r[0], r[1]);
+      const pg = el('g', { 'data-piece': i }, g);
+      el('path', { d: polyD(pts, whole), fill: 'none', stroke: pc.fill, 'stroke-width': s.thickness, 'stroke-linejoin': 'round', 'stroke-linecap': 'butt' }, pg);
+      if (pc.text) {
+        // keep labels upright automatically; "Flip text" inverts that choice
+        const mid = geoTangent(geo, ((r[0] + r[1]) / 2) % 1, s.closed);
+        const flip = (mid[0] < 0) !== !!pc.flipText;
+        // edge alignment leaves room for the arrow tip poking in at the start and the barbs at the end
+        let padStart = s.arrowLength + 6, padEnd = s.arrowLength * 0.45 + 6;
+        if (s.reverse) [padStart, padEnd] = [padEnd, padStart];
+        addLabel(pg, pc, polyD(flip ? pts.slice().reverse() : pts, false), `cl-${s.id}-${i}`, { flipped: flip, padStart, padEnd });
+      }
+    }
+    for (const a of arrows) {
+      const pc = s.pieces[a.piece] || s.pieces[0];
+      const pts = chevronPoints(geoAt(geo, a.pos), a.T, s.arrowStyle, s.arrowWidth, s.arrowLength);
+      drawHead(g, pts, s.arrowStyle, pc.fill, s.arrowWidth, { 'data-piece': a.piece }, true);
+    }
+  }
+}
+
+/** Place edge-aligned labels, and shrink labels that are longer than the room they have. */
+function fitTexts() {
+  shapesLayer.querySelectorAll('text.band-label').forEach(t => {
+    try {
+      const path = document.getElementById(t.dataset.path);
+      const L = path.getTotalLength(), tl = t.getComputedTextLength(), fs = +t.dataset.fs;
+      const align = t.dataset.align, padS = +t.dataset.padS || 0, padE = +t.dataset.padE || 0;
+      let room = L * 0.9;
+      if (align !== 'center') {
+        const ps = Math.min(padS, L * 0.3), pe = Math.min(padE, L * 0.3);
+        t.firstChild.setAttribute('startOffset', f(align === 'start' ? ps : L - pe));
+        room = L - ps - pe;
+      }
+      if (tl > 0 && tl > room) t.setAttribute('font-size', f(fs * room / tl));
+    } catch (_) { /* not measurable yet */ }
+  });
+}
+
+function renderPaper() {
+  const { width, height, background } = state.canvas;
+  const paper = $('#paper'), grid = $('#gridRect');
+  paper.setAttribute('width', width); paper.setAttribute('height', height); paper.setAttribute('fill', background);
+  grid.setAttribute('width', width); grid.setAttribute('height', height);
+  grid.style.display = state.showGrid ? '' : 'none';
+  // background picture for tracing: fitted inside the canvas, under all shapes
+  const img = $('#traceImg');
+  if (state.trace) {
+    img.setAttribute('href', state.trace.src);
+    img.setAttributeNS(XLINK, 'xlink:href', state.trace.src);
+    img.setAttribute('width', width); img.setAttribute('height', height);
+    img.setAttribute('opacity', state.trace.opacity);
+    img.style.display = '';
+  } else {
+    img.removeAttribute('href'); img.removeAttributeNS(XLINK, 'href');
+    img.style.display = 'none';
+  }
+  $('#btnClearTrace').disabled = !state.trace;
+}
+
+function render() {
+  renderPaper();
+  shapesLayer.textContent = '';
+  for (const s of [...state.shapes].sort((a, b) => a.z - b.z)) shapesLayer.appendChild(renderShape(s));
+  fitTexts();
+  addHitBoxes(shapesLayer);
+  renderOverlay();
+}
+
+function handle(parent, name, pt, title, cls = '') {
+  const k = view.k;
+  const c = el('circle', { cx: pt[0], cy: pt[1], r: 6 / k, class: 'handle ' + cls, 'data-handle': name, 'stroke-width': 1.5 / k }, parent);
+  el('title', {}, c).textContent = title;
+}
+function guide(parent, a, b) {
+  el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], class: 'ov-guide', 'stroke-width': 1 / view.k, 'stroke-dasharray': `${4 / view.k} ${3 / view.k}` }, parent);
+}
+
+function drawSelection(s) {
+  const k = view.k, g = el('g', {}, overlay);
+  if (s.type === 'path') {
+    // dashed outline along both edges of the selected piece (keeps its real color visible)
+    const rs = pieceRanges(s), i = clamp(state.selectedPiece || 0, 0, rs.length - 1);
+    const pts = subPts(pathGeo(s), rs[i][0], rs[i][1]), whole = s.closed && !s.cuts.length, h = s.thickness / 2 + 3 / k;
+    const edge = sign => pts.map((p, j) => {
+      const a = pts[Math.max(0, j - 1)], b = pts[Math.min(pts.length - 1, j + 1)], T = norm(sub2(b, a));
+      return [p[0] - T[1] * h * sign, p[1] + T[0] * h * sign];
+    });
+    const L = edge(1), R = edge(-1);
+    const d = whole ? polyD(L, true) + ' ' + polyD(R, true) : polyD(L.concat(R.reverse()), true);
+    el('path', { d, class: 'ov-sel', 'stroke-width': 2 / k, 'stroke-dasharray': `${6 / k} ${4 / k}`, 'stroke-linejoin': 'round' }, g);
+    return;
+  }
+  let d = null;
+  if (s.type === 'arc') d = arcBandPath(s);
+  else if (s.type === 'bezier') d = bezOutlinePath(s);
+  else if (s.type === 'arrow') { const pts = arrowPoints(s); if (pts) d = 'M ' + pts.map(P).join(' L ') + ' Z'; }
+  if (d) {
+    el('path', { d, class: 'ov-sel', 'stroke-width': 1.5 / k, 'stroke-dasharray': `${5 / k} ${3 / k}` }, g);
+  } else {
+    const node = shapesLayer.querySelector(`[data-id="${CSS.escape(s.id)}"]`);
+    if (node) {
+      const b = node.getBBox(), m = 4 / k;
+      el('rect', { x: b.x - m, y: b.y - m, width: b.width + 2 * m, height: b.height + 2 * m, class: 'ov-sel', 'stroke-width': 1.5 / k, 'stroke-dasharray': `${5 / k} ${3 / k}` }, g);
+    }
+  }
+  if (state.tool !== 'select') return;
+
+  if (s.type === 'arc') {
+    const c = [s.cx, s.cy], am = arcAngleAt(s, 0.5);
+    guide(g, c, shapePoint(s, 0.5));
+    handle(g, 'center', c, 'Center – drag to move', 'h-center');
+    handle(g, 'start', shapePoint(s, 0), 'Start angle');
+    handle(g, 'end', shapePoint(s, 1), 'End angle');
+    handle(g, 'radius', shapePoint(s, 0.5), 'Radius');
+    const ro = s.r + arcThick(s) / 2;
+    handle(g, 'thick', [s.cx + ro * Math.cos(am), s.cy + ro * Math.sin(am)], 'Thickness', 'h-thick');
+  } else if (s.type === 'bezier') {
+    guide(g, s.p0, s.p1); guide(g, s.p3, s.p2);
+    handle(g, 'p1', s.p1, 'Control point P1', 'h-ctrl');
+    handle(g, 'p2', s.p2, 'Control point P2', 'h-ctrl');
+    handle(g, 'p0', s.p0, 'Start point P0');
+    handle(g, 'p3', s.p3, 'End point P3');
+    const m = bezAt(s, 0.5), T = shapeTangent(s, 0.5), h = s.thickness / 2;
+    handle(g, 'thick', [m[0] - T[1] * h, m[1] + T[0] * h], 'Thickness', 'h-thick');
+  } else if (s.type === 'circle') {
+    handle(g, 'radius', [s.cx + s.r, s.cy], 'Radius');
+  } else if (s.type === 'arrow' && !s.parentId) {
+    const fr = arrowFrame(s);
+    handle(g, 'rotate', [fr.p[0] + fr.T[0] * s.length, fr.p[1] + fr.T[1] * s.length], 'Rotate');
+  }
+}
+
+function drawCreating() {
+  const k = view.k, c = creating;
+  if (c.type === 'arc') {
+    el('circle', { cx: c.c[0], cy: c.c[1], r: 3 / k, class: 'ov-dot' }, overlay);
+    if (c.step === 1) {
+      const r = dist(c.c, c.p);
+      el('circle', { cx: c.c[0], cy: c.c[1], r, class: 'ov-guide', 'stroke-width': 1 / k, 'stroke-dasharray': `${4 / k} ${3 / k}` }, overlay);
+      guide(overlay, c.c, c.p);
+    } else {
+      const g = renderShape(previewArc());
+      g.setAttribute('opacity', 0.7);
+      overlay.appendChild(g);
+    }
+  } else if (c.type === 'bezier') {
+    const g = renderShape(previewBezier());
+    g.setAttribute('opacity', 0.7);
+    overlay.appendChild(g);
+  } else if (c.type === 'circle') {
+    el('circle', { cx: c.c[0], cy: c.c[1], r: Math.max(c.r, 2 / k), class: 'ov-guide', 'stroke-width': 1.5 / k }, overlay);
+  }
+}
+
+function renderOverlay() {
+  overlay.textContent = '';
+  const s = byId(state.selectedId);
+  if (s) drawSelection(s);
+  if (creating) drawCreating();
+  if (state.tool === 'arrow' && hover && !creating) {
+    const par = byId(hover.id), th = bandThick(par);
+    if (par.type === 'path') {
+      let T = shapeTangent(par, hover.t);
+      if (hover.t === 0 || (par.reverse && hover.t !== 1)) T = neg(T);
+      const pc = par.pieces[pieceAt(par, hover.t)] || par.pieces[0];
+      const pts = chevronPoints(hover.pt, T, par.arrowStyle, par.arrowWidth, par.arrowLength);
+      el('polygon', { points: pts.map(q => q.join(',')).join(' '), fill: pc.fill, opacity: 0.55 }, overlay);
+    } else {
+      const ghost = makeShape('arrow', { parentId: par.id, t: hover.t, reverse: hover.t === 0, width: th * 1.6, length: th * 0.8, fill: par.fill });
+      const g = renderShape(ghost);
+      g.setAttribute('opacity', 0.55);
+      overlay.appendChild(g);
+    }
+    el('circle', { cx: hover.pt[0], cy: hover.pt[1], r: 4 / view.k, class: 'ov-dot' }, overlay);
+  }
+  if (snapMark) el('circle', { cx: snapMark[0], cy: snapMark[1], r: 9 / view.k, class: 'ov-snap', 'stroke-width': 2 / view.k }, overlay);
+}
+
+/* =====================================================================
+   View: pan & zoom
+   ===================================================================== */
+function applyView() {
+  world.setAttribute('transform', `translate(${view.x} ${view.y}) scale(${view.k})`);
+  $('#zoomLabel').textContent = Math.round(view.k * 100) + '%';
+  renderOverlay();
+}
+function zoomAt(factor, sx, sy) {
+  const k = clamp(view.k * factor, 0.1, 8);
+  const wx = (sx - view.x) / view.k, wy = (sy - view.y) / view.k;
+  view.k = k; view.x = sx - wx * k; view.y = sy - wy * k;
+  applyView();
+}
+function zoomCenter(factor) { const r = svg.getBoundingClientRect(); zoomAt(factor, r.width / 2, r.height / 2); }
+function zoomToFit() {
+  const r = svg.getBoundingClientRect();
+  let x0 = 0, y0 = 0, x1 = state.canvas.width, y1 = state.canvas.height;
+  if (state.shapes.length) {
+    try {
+      const b = shapesLayer.getBBox();
+      x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y);
+      x1 = Math.max(x1, b.x + b.width); y1 = Math.max(y1, b.y + b.height);
+    } catch (_) { /* ignore */ }
+  }
+  const pad = 30, w = x1 - x0, h = y1 - y0;
+  const k = clamp(Math.min((r.width - 2 * pad) / w, (r.height - 2 * pad) / h), 0.1, 4);
+  view.k = k;
+  view.x = (r.width - w * k) / 2 - x0 * k;
+  view.y = (r.height - h * k) / 2 - y0 * k;
+  applyView();
+}
+function toWorld(e) {
+  const r = svg.getBoundingClientRect();
+  return [(e.clientX - r.left - view.x) / view.k, (e.clientY - r.top - view.y) / view.k];
+}
+
+/* =====================================================================
+   Tools
+   ===================================================================== */
+let drag = null;      // select-tool drag or pan
+let creating = null;  // in-progress drawing
+let hover = null;     // arrow tool hover target
+let spaceDown = false;
+
+function previewArc() {
+  const c = creating;
+  return makeShape('arc', {
+    cx: c.c[0], cy: c.c[1], r: c.r, startAngle: c.a0, endAngle: c.a0 + c.sw,
+    thickness: Math.min(40, c.r), fill: state.lastFill
+  });
+}
+function previewBezier() {
+  const c = creating;
+  return makeShape('bezier', Object.assign(bezierFrom(c.p0, c.d0, c.p3, c.d3), { thickness: 40, fill: state.lastFill }));
+}
+function finishCreate(s, e) {
+  addShape(s);
+  creating = null;
+  state.selectedId = s.id;
+  if (!e.shiftKey) setTool('select'); else updateHint();
+  render(); buildPanel(); commit();
+}
+function findBandNear(p) {
+  let best = null;
+  for (const s of state.shapes) {
+    if (!isStrip(s)) continue;
+    const nr = nearestOnBand(s, p), tol = bandThick(s) / 2 + 10 / view.k;
+    if (nr.d <= tol && (!best || nr.d < best.d)) best = { id: s.id, t: nr.t, pt: nr.pt, d: nr.d, s };
+  }
+  if (!best) return null;
+  if (!(best.s.type === 'path' && best.s.closed)) {
+    const e0 = shapePoint(best.s, 0), e1 = shapePoint(best.s, 1), lim = END_SNAP_PX / view.k;
+    if (dist(best.pt, e0) < lim) { best.t = 0; best.pt = e0; }
+    else if (dist(best.pt, e1) < lim) { best.t = 1; best.pt = e1; }
+  }
+  best.t = f(best.t, best.s.type === 'path' ? 5 : 4);
+  return best;
+}
+
+function applyHandle(s, d, p, e) {
+  const o = d.orig, h = d.handle;
+  if (s.type === 'arc') {
+    const c = [s.cx, s.cy];
+    if (h === 'center') {
+      const sp = snap(p, 'center', s.id, e).pt; s.cx = f(sp[0]); s.cy = f(sp[1]);
+    } else if (h === 'start' || h === 'end') {
+      const sp = snap(p, 'end', s.id, e).pt;
+      const a = deg(Math.atan2(sp[1] - s.cy, sp[0] - s.cx));
+      const key = h === 'start' ? 'startAngle' : 'endAngle', other = h === 'start' ? 'endAngle' : 'startAngle';
+      s[key] = f(unwrap(a, s[key]));
+      if (Math.abs(s[key] - s[other]) > 359.9) s[key] = f(s[other] + Math.sign(s[key] - s[other]) * 359.9);
+    } else if (h === 'radius') {
+      const sp = snap(p, 'end', s.id, e).pt; s.r = f(Math.max(4, dist(sp, c)));
+    } else if (h === 'thick') {
+      s.thickness = f(clamp(2 * Math.abs(dist(p, c) - s.r), 2, 2 * s.r));
+    }
+  } else if (s.type === 'bezier') {
+    if (h === 'p0' || h === 'p3') {
+      const sn = snap(p, 'end', s.id, e), ctrl = h === 'p0' ? 'p1' : 'p2';
+      s[h] = [f(sn.pt[0]), f(sn.pt[1])];
+      if (sn.dir) {     // smooth join: align control point with the other band's direction
+        const len = Math.max(30, dist(o[ctrl], o[h]));
+        s[ctrl] = [f(sn.pt[0] + sn.dir[0] * len), f(sn.pt[1] + sn.dir[1] * len)];
+      } else {
+        s[ctrl] = [f(o[ctrl][0] + sn.pt[0] - o[h][0]), f(o[ctrl][1] + sn.pt[1] - o[h][1])];
+      }
+    } else if (h === 'p1' || h === 'p2') {
+      s[h] = [f(p[0]), f(p[1])];
+    } else if (h === 'thick') {
+      s.thickness = f(clamp(2 * dist(p, bezAt(s, 0.5)), 2, 400));
+    }
+  } else if (s.type === 'circle' && h === 'radius') {
+    s.r = f(Math.max(4, dist(p, [s.cx, s.cy])));
+  } else if (s.type === 'arrow' && h === 'rotate') {
+    let a = deg(Math.atan2(p[1] - s.y, p[0] - s.x));
+    if (s.reverse) a += 180;
+    s.angle = f(((a % 360) + 360) % 360);
+  }
+}
+
+const TOOLS = {
+  select: {
+    hint: 'Click a shape to select it · drag to move · drag handles to reshape · drag empty space to pan · mouse wheel to zoom',
+    down(p, e) {
+      const h = e.target.closest('[data-handle]'), s = byId(state.selectedId);
+      if (h && s) { drag = { kind: 'handle', handle: h.dataset.handle, orig: clone(s), changed: false }; return; }
+      const g = e.target.closest('#shapesLayer g.shape');
+      if (g) {
+        const pc = e.target.closest('[data-piece]'), piece = pc ? +pc.dataset.piece : 0;
+        if (g.dataset.id !== state.selectedId || (pc && piece !== state.selectedPiece)) selectShape(g.dataset.id, piece);
+        drag ={ kind: 'move', orig: clone(byId(g.dataset.id)), start: p, changed: false };
+        return;
+      }
+      selectShape(null);
+      startPan(e);
+    },
+    move(p, e) {
+      const s = byId(state.selectedId);
+      if (!drag || !s) return false;
+      if (drag.kind === 'move') {
+        const dx = p[0] - drag.start[0], dy = p[1] - drag.start[1];
+        if (!drag.changed && Math.hypot(dx, dy) * view.k < 3) return false;
+        drag.changed = true;
+        if (s.type === 'arrow' && s.parentId) s.t = f(nearestOnBand(byId(s.parentId), p).t, 4);
+        else moveWithSnap(s, drag.orig, dx, dy, e);
+      } else {
+        drag.changed = true;
+        applyHandle(s, drag, p, e);
+      }
+      syncPanel();
+      return true;
+    },
+    up() { if (drag && drag.changed) commit(); drag = null; }
+  },
+
+  arc: {
+    hint() {
+      if (!creating) return 'Arc: click to place the center (snaps to other arc centers so ring segments line up)';
+      if (creating.step === 1) return 'Arc: click to set the radius and start angle (snaps to band ends)';
+      return 'Arc: move around the center and click to set the end angle · Esc cancels';
+    },
+    down(p, e) {
+      if (!creating) {
+        const c = snap(p, 'center', null, e).pt;
+        creating = { type: 'arc', step: 1, c, p: c };
+      } else if (creating.step === 1) {
+        const sp = snap(p, 'end', null, e).pt, r = dist(sp, creating.c);
+        if (r * view.k < 5) return;
+        const a = deg(Math.atan2(sp[1] - creating.c[1], sp[0] - creating.c[0]));
+        Object.assign(creating, { step: 2, r, a0: a, lastA: a, sw: 0 });
+      } else {
+        this.updateSweep(p, e);
+        if (Math.abs(creating.sw) < 2) return;
+        const s = previewArc();
+        s.cx = f(s.cx); s.cy = f(s.cy); s.r = f(s.r);
+        s.startAngle = f(s.startAngle); s.endAngle = f(s.endAngle); s.thickness = f(s.thickness);
+        s.flipText = autoFlip(s);
+        finishCreate(s, e);
+        return;
+      }
+      updateHint();
+    },
+    move(p, e) {
+      if (!creating) { snap(p, 'center', null, e); return; }
+      if (creating.step === 1) creating.p = snap(p, 'end', null, e).pt;
+      else this.updateSweep(p, e);
+    },
+    updateSweep(p, e) {
+      const c = creating, sp = snap(p, 'end', null, e).pt;
+      const a = unwrap(deg(Math.atan2(sp[1] - c.c[1], sp[0] - c.c[0])), c.lastA);
+      c.sw = clamp(c.sw + (a - c.lastA), -359.9, 359.9);
+      c.lastA = a;
+    }
+  },
+
+  bezier: {
+    hint() {
+      return !creating ? 'Bézier: click (or press and drag) to set the start point · starting on a band end continues it smoothly'
+                       : 'Bézier: click to set the end point, then drag the control points to shape it · Esc cancels';
+    },
+    down(p, e) {
+      if (!creating) {
+        const sn = snap(p, 'end', null, e);
+        creating = { type: 'bezier', p0: sn.pt, d0: sn.dir || null, p3: sn.pt, d3: null, downAt: p, dragging: true };
+        updateHint();
+      } else this.finish(e);
+    },
+    move(p, e) {
+      if (!creating) { snap(p, 'end', null, e); return; }
+      const sn = snap(p, 'end', null, e);
+      creating.p3 = sn.pt; creating.d3 = sn.dir || null;
+    },
+    up(p, e) {
+      if (!creating || !creating.dragging) return;
+      creating.dragging = false;
+      if (dist(p, creating.downAt) * view.k > 6) this.finish(e);
+    },
+    finish(e) {
+      if (dist(creating.p0, creating.p3) * view.k < 5) return;
+      const s = previewBezier();
+      s.flipText = autoFlip(s);
+      finishCreate(s, e);
+    }
+  },
+
+  arrow: {
+    hint: 'Arrow: click on a band to attach a chevron (snaps to band ends) · on a snapped figure each arrow splits it into pieces · or drag on empty space to aim a free arrow',
+    down(p, e) {
+      if (hover && byId(hover.id) && byId(hover.id).type === 'path') {
+        // snapped figure: an arrow cuts it, and the part after the arrow becomes its own piece
+        const s = byId(hover.id);
+        let piece;
+        if (!s.closed && hover.t === 1) { s.headArrow = true; piece = s.pieces.length - 1; }
+        else if (!s.closed && hover.t === 0) { s.tailArrow = true; piece = 0; }
+        else {
+          piece = insertCut(s, hover.t);
+          if (piece < 0) { toast('Too close to another arrow.'); return; }
+        }
+        hover = null;
+        selectShape(s.id, piece);
+        render(); commit();
+        return;
+      }
+      if (hover) {
+        const par = byId(hover.id), th = bandThick(par);
+        const s = makeShape('arrow', {
+          parentId: par.id, t: hover.t, reverse: hover.t === 0,
+          width: f(th * 1.6), length: f(th * 0.8), fill: par.fill
+        });
+        hover = null;
+        finishCreate(s, e);
+      } else {
+        const s = addShape(makeShape('arrow', { x: f(p[0]), y: f(p[1]), angle: 0, width: 48, length: 24, fill: state.lastFill }));
+        state.selectedId = s.id;
+        creating = { type: 'arrow-free', id: s.id, p0: p };
+        buildPanel();
+      }
+    },
+    move(p) {
+      if (creating) {
+        const s = byId(creating.id);
+        if (dist(p, creating.p0) * view.k > 4) s.angle = f((deg(Math.atan2(p[1] - s.y, p[0] - s.x)) + 360) % 360);
+        return true;
+      }
+      hover = findBandNear(p);
+    },
+    up(p, e) {
+      if (!creating) return;
+      creating = null;
+      if (!e.shiftKey) setTool('select');
+      buildPanel(); commit();
+    }
+  },
+
+  text: {
+    hint: 'Text: click to place a label, then type it in the right panel',
+    down(p, e) {
+      finishCreate(makeShape('text', { x: f(p[0]), y: f(p[1]) }), e);
+      setTimeout(() => { const i = panel.querySelector('[data-prop="text"]'); if (i) { i.focus(); i.select(); } });
+    }
+  },
+
+  circle: {
+    hint: 'Circle: click to place a numbered badge, or press and drag to size it',
+    down(p, e) { creating = { type: 'circle', c: snap(p, 'center', null, e).pt, r: 0 }; },
+    move(p, e) {
+      if (creating) creating.r = dist(p, creating.c);
+      else snap(p, 'center', null, e);
+    },
+    up(p, e) {
+      if (!creating) return;
+      const r = creating.r * view.k < 6 ? 18 : creating.r;
+      const n = state.shapes.filter(s => s.type === 'circle').length + 1;
+      // numbered badge: white circle outlined in the current color, like ① in a section
+      const col = /^#FFFFFF$/i.test(state.lastFill) ? '#333333' : state.lastFill;
+      finishCreate(makeShape('circle', {
+        cx: f(creating.c[0]), cy: f(creating.c[1]), r: f(r), text: String(n), fontSize: f(Math.max(10, r * 0.9)),
+        stroke: col, textColor: col
+      }), e);
+    }
+  },
+
+  item: {
+    hint: 'Icon: click to place an icon with a label (e.g. "Data" inside a loop), then pick the icon and type the label in the right panel',
+    down(p, e) {
+      const col = /^#FFFFFF$/i.test(state.lastFill) ? '#1F2328' : state.lastFill;
+      finishCreate(makeShape('item', { x: f(p[0]), y: f(p[1]), iconColor: col, textColor: col }), e);
+      setTimeout(() => { const i = panel.querySelector('[data-prop="text"]'); if (i) { i.focus(); i.select(); } });
+    }
+  },
+
+  title: {
+    hint: 'Title: click where the top-left of the title should go, then type the title and subtitle in the right panel',
+    down(p, e) {
+      finishCreate(makeShape('title', { x: f(p[0]), y: f(p[1]), title: 'Diagram title', subtitle: 'Subtitle' }), e);
+      setTimeout(() => { const i = panel.querySelector('[data-prop="title"]'); if (i) { i.focus(); i.select(); } });
+    }
+  }
+};
+
+function setTool(name) {
+  state.tool = name;
+  creating = null; hover = null; snapMark = null;
+  document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === name));
+  svg.classList.toggle('draw', name !== 'select');
+  svg.classList.toggle('tool-select', name === 'select');
+  updateHint();
+  renderOverlay();
+}
+function updateHint() {
+  const t = TOOLS[state.tool];
+  let h = typeof t.hint === 'function' ? t.hint() : t.hint;
+  if (state.tool !== 'select') h += ' · Shift keeps the tool active · Alt disables snapping';
+  $('#hint').textContent = h;
+}
+function cancelCreate() {
+  if (creating && creating.type === 'arrow-free') {
+    state.shapes = state.shapes.filter(s => s.id !== creating.id);
+    state.selectedId = null;
+    buildPanel();
+  }
+  creating = null; snapMark = null;
+  render(); updateHint();
+}
+
+/* ---------- Pointer wiring ---------- */
+function startPan(e) {
+  drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, ox: view.x, oy: view.y };
+  svg.classList.add('panning');
+}
+svg.addEventListener('pointerdown', e => {
+  if (e.button === 1 || (e.button === 0 && spaceDown)) { e.preventDefault(); svg.setPointerCapture(e.pointerId); startPan(e); return; }
+  if (e.button !== 0) return;
+  svg.setPointerCapture(e.pointerId);
+  snapMark = null;
+  TOOLS[state.tool].down(toWorld(e), e);
+  render();
+});
+svg.addEventListener('pointermove', e => {
+  const p = toWorld(e);
+  $('#coords').textContent = `x ${Math.round(p[0])}, y ${Math.round(p[1])} · ${Math.round(view.k * 100)}%`;
+  if (drag && drag.kind === 'pan') {
+    view.x = drag.ox + e.clientX - drag.sx; view.y = drag.oy + e.clientY - drag.sy;
+    applyView(); return;
+  }
+  snapMark = null;
+  const tool = TOOLS[state.tool];
+  const changed = tool.move ? tool.move(p, e) : false;
+  if (changed) render(); else renderOverlay();
+});
+function pointerEnd(e) {
+  if (drag && drag.kind === 'pan') { drag = null; svg.classList.remove('panning'); return; }
+  const tool = TOOLS[state.tool];
+  if (tool.up) tool.up(toWorld(e), e);
+  snapMark = null;
+  render();
+}
+svg.addEventListener('pointerup', pointerEnd);
+svg.addEventListener('pointercancel', pointerEnd);
+svg.addEventListener('pointerleave', () => { if (hover) { hover = null; renderOverlay(); } });
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = svg.getBoundingClientRect();
+  zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+}, { passive: false });
+svg.addEventListener('dblclick', e => {
+  // double-click a band in Select mode to jump to its text field
+  if (state.tool === 'select' && byId(state.selectedId)) {
+    const i = panel.querySelector('[data-prop="text"]');
+    if (i) { i.focus(); i.select(); }
+  }
+});
+
+/* =====================================================================
+   Selection & editing commands
+   ===================================================================== */
+function selectShape(id, piece = 0) { state.selectedId = id; state.selectedPiece = piece; buildPanel(); renderOverlay(); }
+
+function deleteSelected() {
+  const s = byId(state.selectedId);
+  if (!s) return;
+  const kids = isBand(s) ? arrowsOf(s.id) : [];
+  state.shapes = state.shapes.filter(x => x !== s && !kids.includes(x));
+  state.selectedId = null;
+  render(); buildPanel(); commit();
+  toast(kids.length ? `Deleted the band and ${kids.length} attached arrow(s) · Ctrl+Z to undo` : 'Deleted · Ctrl+Z to undo');
+}
+function duplicateSelected() {
+  const s = byId(state.selectedId);
+  if (!s) return;
+  const c = clone(s);
+  if (c.type === 'arrow' && c.parentId) c.t = f(Math.min(1, c.t + 0.1), 4);
+  else translateShape(c, clone(c), 20, 20);
+  addShape(c);
+  if (isBand(s)) arrowsOf(s.id).forEach(a => { const ca = clone(a); ca.parentId = c.id; addShape(ca); });
+  state.selectedId = c.id;
+  render(); buildPanel(); commit();
+}
+function reorder(front) {
+  const s = byId(state.selectedId);
+  if (!s) return;
+  if (s.type === 'path') {
+    // reorder the selected piece within its figure (renumbered 0..n-1 so layers stay small)
+    const i = clamp(state.selectedPiece || 0, 0, s.pieces.length - 1);
+    const order = s.pieces.map((pc, k) => k).sort((a, b) => pieceLayer(s, a) - pieceLayer(s, b) || a - b).filter(k => k !== i);
+    if (front) order.push(i); else order.unshift(i);
+    order.forEach((k, rank) => { s.pieces[k].layer = rank; });
+    // squash back to 0 when the order matches the natural one, so untouched figures stay clean
+    if (order.every((k, rank) => k === rank)) s.pieces.forEach(pc => { pc.layer = 0; });
+  }
+  if (s.type !== 'path' || front) s.z = front ? maxZ() + 1 : state.shapes.reduce((m, x) => Math.min(m, x.z), 0) - 1;
+  normalizeZ(); render(); commit();
+}
+function detachArrow() {
+  const s = byId(state.selectedId);
+  if (!s || s.type !== 'arrow' || !s.parentId) return;
+  const fr = arrowFrame(s);
+  Object.assign(s, { parentId: null, x: f(fr.p[0]), y: f(fr.p[1]), angle: f((deg(Math.atan2(fr.T[1], fr.T[0])) + 360) % 360), reverse: false });
+  render(); buildPanel(); commit();
+}
+function nudge(dx, dy) {
+  const s = byId(state.selectedId);
+  if (!s) return;
+  if (s.type === 'arrow' && s.parentId) s.t = f(clamp(s.t + (dx + dy) * 0.005, 0, 1), 4);
+  else translateShape(s, clone(s), dx, dy);
+  render(); syncPanel(); commit();
+}
+
+/* =====================================================================
+   Right panel
+   ===================================================================== */
+const section = (title, body) => `<div class="section"><h3>${title}</h3>${body}</div>`;
+const row = (label, inner) => `<label class="row"><span>${label}</span>${inner}</label>`;
+const num = (prop, min, step = 1) => `<input type="number" data-prop="${prop}" data-kind="num" step="${step}"${min != null ? ` min="${min}" data-min="${min}"` : ''}>`;
+const pair = (label, a, b, min) => `<div class="row"><span>${label}</span><div class="pair">${num(a, min)}${num(b, min)}</div></div>`;
+const range = (prop, min, max, step) => `<input type="range" data-prop="${prop}" data-kind="num" min="${min}" max="${max}" step="${step}">`;
+const check = (label, prop) => `<label class="row"><span>${label}</span><span><input type="checkbox" data-prop="${prop}" data-kind="bool"></span></label>`;
+const textIn = (prop, ph = '') => `<input type="text" data-prop="${prop}" placeholder="${ph}">`;
+/** Text alignment along the band; the Position slider only applies when centered. */
+const alignRows = (pre, current) =>
+  row('Align', `<select data-prop="${pre}textAlign"><option value="center">Center (use Position)</option><option value="start">Start edge</option><option value="end">End edge</option></select>`) +
+  (current === 'start' || current === 'end' ? '' : row('Position', range(pre + 'textOffset', 0, 100, 1)));
+const font = (pre = '') => `<div class="row"><span>Font size</span><div class="pair">${num(pre + 'fontSize', 4)}<label class="chk"><input type="checkbox" data-prop="${pre}bold" data-kind="bool">Bold</label></div></div>`;
+function colorField(prop, label, swatches = true) {
+  let h = `<div class="row"><span>${label}</span><div class="color"><input type="color" data-prop="${prop}" data-kind="color"><input type="text" data-prop="${prop}" data-kind="hex" maxlength="7" spellcheck="false"></div></div>`;
+  if (swatches) h += `<div class="swatches">${PALETTE.map(c => `<button class="sw" data-swatch="${prop}" data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}</div>`;
+  return h;
+}
+const panelTarget = () => byId(state.selectedId) || state.canvas;
+
+function buildPanel() {
+  const s = byId(state.selectedId);
+  let h;
+  if (!s) {
+    h = `<div class="props-banner">
+        <div class="pb-title">PROPERTIES</div>
+        <div class="pb-state">Nothing selected</div>
+        <p>Pick a tool in the top bar, or click any shape to change its color and text.</p>
+      </div>` +
+      section('Canvas',
+        colorField('background', 'Background', false) +
+        pair('Size (w × h)', 'width', 'height', 100) +
+        `<label class="row"><span>Show grid</span><span><input type="checkbox" data-ui="grid"${state.showGrid ? ' checked' : ''}></span></label>`) +
+      section('Trace image', state.trace
+        ? `<p class="note">Tracing over <b>${esc(state.trace.name)}</b>. Draw your shapes on top, then clear the picture.</p>
+           <label class="row"><span>Visibility</span><input type="range" data-ui="traceOpacity" min="0.1" max="1" step="0.05" value="${state.trace.opacity}"></label>
+           <div class="actions" style="border:none;padding-top:4px"><button class="btn" data-action="traceReplace">Replace picture</button><button class="btn danger" data-action="traceClear">Clear picture</button></div>`
+        : `<p class="note">Upload a picture of a flowchart with <b>Trace image</b> to show it behind the canvas and draw over it.</p>
+           <button class="btn" data-action="traceReplace">Upload picture…</button>`) +
+      section('Tools', `<ul class="help">
+        <li><b>Arc</b>: click the center, then the start, then the end.</li>
+        <li><b>Bézier</b>: click the start, then the end, then drag the filled control points to make S-curves.</li>
+        <li><b>Arrow</b>: click on a band (or its end) to add a chevron that follows the curve.</li>
+        <li><b>Text</b> / <b>Circle</b>: labels and numbered badges such as ①.</li>
+        <li><b>Icon</b>: an icon with a label under it, such as a cloud and "Data" inside a loop.</li>
+        <li><b>Title</b>: a heading with a subtitle, such as at the top-left of the diagram.</li>
+        <li>Band ends snap together. Arc centers snap, so ring segments line up.</li>
+        <li><b>Snap it</b>: fills the gaps and joins all bands into one figure. Add arrows on it to split it into pieces you can color.</li></ul>`) +
+      section('Shortcuts', `<div class="keys">
+        <kbd>V A B R T C I H</kbd><span>Tools</span>
+        <kbd>S</kbd><span>Snap it</span>
+        <kbd>Del</kbd><span>Delete selected</span>
+        <kbd>Ctrl+D</kbd><span>Duplicate</span>
+        <kbd>Ctrl+Z / Y</kbd><span>Undo / redo</span>
+        <kbd>Ctrl+S / O</kbd><span>Save / load JSON</span>
+        <kbd>Arrows</kbd><span>Nudge (Shift = 10px)</span>
+        <kbd>Space+drag</kbd><span>Pan</span>
+        <kbd>Wheel</kbd><span>Zoom</span>
+        <kbd>F</kbd><span>Zoom to fit</span>
+        <kbd>Esc</kbd><span>Cancel / deselect</span></div>`);
+  } else {
+    h = `<div class="ph"><div><div class="eyebrow">Selected</div><h2>${TYPE_NAMES[s.type]}</h2></div><span class="idtag">${esc(s.id)}</span></div>`;
+    if (isBand(s)) {
+      h += section('Appearance', colorField('fill', 'Fill') + row('Thickness', num('thickness', 2)) + row('Opacity', range('opacity', 0.1, 1, 0.05)));
+      h += section('Text', row('Text', textIn('text', 'e.g. TRAIN')) + colorField('textColor', 'Text color', false) + font() +
+        alignRows('', s.textAlign) + check('Flip text', 'flipText'));
+      h += s.type === 'arc'
+        ? section('Geometry', pair('Center x, y', 'cx', 'cy') + row('Radius', num('r', 2)) + pair('Start, end °', 'startAngle', 'endAngle') +
+            `<p class="note">Angles are measured clockwise from 3 o'clock.</p>`)
+        : section('Geometry', pair('Start P0', 'p0.0', 'p0.1') + pair('Control P1', 'p1.0', 'p1.1') +
+            pair('Control P2', 'p2.0', 'p2.1') + pair('End P3', 'p3.0', 'p3.1'));
+    } else if (s.type === 'arrow') {
+      h += section('Appearance', colorField('fill', 'Fill') +
+        row('Style', `<select data-prop="style">${ARROW_STYLE_OPTIONS}</select>`) +
+        pair('Width, length', 'width', 'length', 1) + check('Reverse', 'reverse') + row('Opacity', range('opacity', 0.1, 1, 0.05)) +
+        (s.style === 'notch-tail' || s.style === 'gap' ? `<p class="note">This style is drawn in the canvas background color to cut into the band.</p>` : ''));
+      h += s.parentId
+        ? section('Attachment', `<p class="note">Attached to <b>${esc(s.parentId)}</b>. Drag the arrow to slide it along the band.</p>` +
+            row('Position', range('t', 0, 1, 0.005)) + `<button class="btn" data-action="detach">Detach from band</button>`)
+        : section('Position', pair('Point x, y', 'x', 'y') + row('Angle °', num('angle')));
+    } else if (s.type === 'text') {
+      h += section('Text', row('Text', `<textarea data-prop="text" rows="2"></textarea>`) + colorField('textColor', 'Color') + font() +
+        row('Opacity', range('opacity', 0.1, 1, 0.05)));
+      h += section('Position', pair('Point x, y', 'x', 'y'));
+    } else if (s.type === 'circle') {
+      h += section('Appearance', colorField('fill', 'Fill') + colorField('stroke', 'Border', false) + row('Border width', num('strokeWidth', 0, 0.5)) +
+        row('Opacity', range('opacity', 0.1, 1, 0.05)));
+      h += section('Text', row('Text', textIn('text', 'e.g. 1')) + colorField('textColor', 'Text color', false) + font());
+      h += section('Geometry', pair('Center x, y', 'cx', 'cy') + row('Radius', num('r', 2)));
+    } else if (s.type === 'item') {
+      const grid = Object.entries(ICONS).map(([k, ic]) =>
+        `<button class="icon-btn${!s.image && s.icon === k ? ' on' : ''}" data-action="pickIcon" data-icon="${k}" title="${ic.name}"><svg viewBox="0 0 24 24">${iconMarkup(k)}</svg></button>`).join('');
+      h += section('Icon', `<div class="icon-grid">${grid}</div>` +
+        `<div class="actions" style="border:none;padding-top:0"><button class="btn" data-action="itemImage">Upload picture…</button><button class="btn" data-action="noIcon">No icon</button></div>` +
+        (s.image ? `<p class="note">Using an uploaded picture. Pick an icon above to switch back.</p>` : colorField('iconColor', 'Icon color')) +
+        row('Icon size', num('iconSize', 8)));
+      h += section('Label', row('Text', textIn('text', 'e.g. Data')) + colorField('textColor', 'Text color') + font() +
+        row('Gap', num('gap', 0)) + row('Opacity', range('opacity', 0.1, 1, 0.05)));
+      h += section('Position', pair('Center x, y', 'x', 'y'));
+    } else if (s.type === 'title') {
+      h += section('Title', row('Title', textIn('title', 'e.g. MLOps: Eternal Knot')) + colorField('titleColor', 'Color', false) +
+        `<div class="row"><span>Size</span><div class="pair">${num('titleSize', 6)}<label class="chk"><input type="checkbox" data-prop="bold" data-kind="bool">Bold</label></div></div>`);
+      h += section('Subtitle', row('Subtitle', textIn('subtitle', 'e.g. Machine Learning Lifecycle')) + colorField('subtitleColor', 'Color', false) +
+        row('Size', num('subtitleSize', 6)));
+      h += section('Layout', row('Align', `<select data-prop="align"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select>`) +
+        pair('Point x, y', 'x', 'y') + row('Opacity', range('opacity', 0.1, 1, 0.05)) +
+        `<p class="note">The point is the top-left of the title when aligned left (top-center / top-right otherwise).</p>`);
+    } else if (s.type === 'path') {
+      const n = s.pieces.length, i = state.selectedPiece = clamp(state.selectedPiece || 0, 0, n - 1), pre = `pieces.${i}.`;
+      h = `<div class="ph"><div><div class="eyebrow">Selected</div><h2>Snapped figure</h2></div><span class="idtag">piece ${i + 1} of ${n}</span></div>`;
+      // the arrows at the start / end of this piece, so they can be removed (merging pieces back)
+      const c = s.cuts.length;
+      const startCut = s.closed ? (c ? i : -1) : i - 1;
+      const endCut = s.closed ? (c > 1 ? (i + 1) % c : -1) : (i < c ? i : -1);
+      let cutBtns = '';
+      if (startCut >= 0) cutBtns += `<button class="btn" data-action="removeCut" data-cut="${startCut}">Remove arrow before</button>`;
+      if (endCut >= 0) cutBtns += `<button class="btn" data-action="removeCut" data-cut="${endCut}">Remove arrow after</button>`;
+      h += section('This piece', colorField(pre + 'fill', 'Fill') +
+        row('Text', textIn(pre + 'text', 'e.g. TRAIN')) + colorField(pre + 'textColor', 'Text color', false) + font(pre) +
+        alignRows(pre, s.pieces[i].textAlign) + check('Flip text', pre + 'flipText') +
+        (cutBtns ? `<div class="actions" style="border:none;padding-top:4px">${cutBtns}</div>` : ''));
+      h += section('Whole figure',
+        `<p class="note">Use the <b>Arrow</b> tool on the figure to split it into pieces. Click a piece to edit it.</p>` +
+        row('Thickness', num('thickness', 2)) + row('Opacity', range('opacity', 0.1, 1, 0.05)) +
+        row('Arrow style', `<select data-prop="arrowStyle">${ARROW_STYLE_OPTIONS}</select>`) +
+        pair('Arrow w, l', 'arrowWidth', 'arrowLength', 1) + check('Reverse arrows', 'reverse') +
+        (s.closed ? '' : check('Arrow at start', 'tailArrow') + check('Arrow at end', 'headArrow')) +
+        `<button class="btn" data-action="pathColorAll">Use this piece's color everywhere</button>`);
+    }
+    h += `<div class="actions">
+      <button class="btn" data-action="duplicate">Duplicate</button>
+      <button class="btn danger" data-action="delete">Delete</button>
+      <button class="btn" data-action="front">${s.type === 'path' ? 'Bring piece to front' : 'Bring to front'}</button>
+      <button class="btn" data-action="back">${s.type === 'path' ? 'Send piece to back' : 'Send to back'}</button></div>`;
+  }
+  panel.innerHTML = h;
+  syncPanel(true);
+}
+
+function getProp(o, path) { return path.split('.').reduce((v, k) => (v == null ? v : v[k]), o); }
+function setProp(o, path, v) {
+  const ks = path.split('.'), last = ks.pop();
+  const tgt = ks.reduce((x, k) => x[k], o);
+  tgt[last] = v;
+}
+function setInputValue(i, v) {
+  const kind = i.dataset.kind;
+  if (kind === 'bool') i.checked = !!v;
+  else if (kind === 'color') i.value = /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : '#000000';
+  else if (kind === 'num') i.value = v == null ? '' : String(f(+v));
+  else i.value = v == null ? '' : v;
+}
+function syncPanel(all) {
+  const tgt = panelTarget();
+  panel.querySelectorAll('[data-prop]').forEach(i => {
+    if (!all && i === document.activeElement && i.type !== 'range') return;
+    setInputValue(i, getProp(tgt, i.dataset.prop));
+  });
+}
+
+function applyValue(tgt, prop, v) {
+  const old = getProp(tgt, prop);
+  setProp(tgt, prop, v);
+  if (prop === 'fill' && tgt.type) {
+    state.lastFill = v;
+    // arrows that matched their band's old color follow the new color
+    if (isBand(tgt)) arrowsOf(tgt.id).forEach(a => { if (String(a.fill).toUpperCase() === String(old).toUpperCase()) a.fill = v; });
+  }
+  const isCut = st => st === 'notch-tail' || st === 'gap';   // styles that cut into the band
+  if (tgt.type === 'arrow' && prop === 'style' && tgt.parentId && v !== old) {
+    const sz = headSize(v, bandThick(byId(tgt.parentId)));
+    Object.assign(tgt, { width: sz.w, length: sz.l });
+    if (isCut(v) !== isCut(old)) tgt.reverse = isCut(v) ? tgt.t >= 0.5 : tgt.t === 0;
+  }
+  if (tgt.type === 'arc' && prop === 'thickness') tgt.thickness = Math.min(tgt.thickness, 2 * tgt.r);
+  if (tgt.type === 'path') {
+    if (prop.endsWith('.fill')) state.lastFill = v;
+    if (prop === 'arrowStyle' && v !== old) {
+      const sz = headSize(v, tgt.thickness);
+      Object.assign(tgt, { arrowWidth: sz.w, arrowLength: sz.l });
+    }
+  }
+}
+function applyInput(i) {
+  const tgt = panelTarget(), kind = i.dataset.kind || 'str', prop = i.dataset.prop;
+  let v;
+  if (kind === 'num') {
+    v = parseFloat(i.value);
+    if (!isFinite(v)) return false;
+    if (i.dataset.min != null) v = Math.max(+i.dataset.min, v);
+  } else if (kind === 'bool') v = i.checked;
+  else if (kind === 'color' || kind === 'hex') {
+    v = i.value.trim().toUpperCase();
+    if (!/^#[0-9A-F]{6}$/.test(v)) return false;
+  } else v = i.value;
+  applyValue(tgt, prop, v);
+  panel.querySelectorAll(`[data-prop="${prop}"]`).forEach(o => { if (o !== i) setInputValue(o, getProp(tgt, prop)); });
+  render();
+  return true;
+}
+panel.addEventListener('input', e => {
+  if (e.target.dataset.ui === 'traceOpacity' && state.trace) { state.trace.opacity = +e.target.value; renderPaper(); return; }
+  if (e.target.dataset.prop) applyInput(e.target);
+});
+panel.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.ui === 'grid') { state.showGrid = t.checked; renderPaper(); return; }
+  if (!t.dataset.prop) return;
+  applyInput(t);
+  commit();
+  if (/^(style|arrowStyle)$|textAlign$/.test(t.dataset.prop)) buildPanel(); else syncPanel(true);
+});
+panel.addEventListener('click', e => {
+  const sw = e.target.closest('[data-swatch]');
+  if (sw) {
+    applyValue(panelTarget(), sw.dataset.swatch, sw.dataset.color);
+    render(); syncPanel(true); commit();
+    return;
+  }
+  const b = e.target.closest('[data-action]');
+  if (!b) return;
+  ({ delete: deleteSelected, duplicate: duplicateSelected, front: () => reorder(true), back: () => reorder(false), detach: detachArrow,
+     traceReplace: openTrace, traceClear: clearTrace,
+     removeCut: () => removeCutAction(+b.dataset.cut), pathColorAll,
+     pickIcon: () => setItemIcon(b.dataset.icon), noIcon: () => setItemIcon(''),
+     itemImage: () => $('#itemImageInput').click() })[b.dataset.action]();
+});
+function setItemIcon(key) {
+  const s = byId(state.selectedId);
+  if (!s || s.type !== 'item') return;
+  s.icon = key; s.image = null;
+  render(); buildPanel(); commit();
+}
+$('#itemImageInput').addEventListener('change', e => {
+  const file = e.target.files[0], s = byId(state.selectedId);
+  e.target.value = '';
+  if (!file || !s || s.type !== 'item') return;
+  if (!file.type.startsWith('image/')) { toast('Please choose an image file (PNG, JPG, GIF, WebP or SVG).', true); return; }
+  if (file.size > 1.5 * 1024 * 1024) { toast('That picture is over 1.5 MB. Please use a smaller one, because it is stored inside the JSON file.', true); return; }
+  const reader = new FileReader();
+  reader.onload = () => { s.image = reader.result; render(); buildPanel(); commit(); };
+  reader.onerror = () => toast('Could not read that file.', true);
+  reader.readAsDataURL(file);
+});
+function removeCutAction(ci) {
+  const s = byId(state.selectedId);
+  if (!s || s.type !== 'path') return;
+  const p = state.selectedPiece;
+  // the merged piece keeps the style of the piece before the removed arrow
+  const startCut = s.closed ? p : p - 1;
+  removeCut(s, ci);
+  if (ci === startCut) state.selectedPiece = s.closed ? (p - 1 + s.pieces.length) % s.pieces.length : p - 1;
+  state.selectedPiece = clamp(state.selectedPiece, 0, s.pieces.length - 1);
+  render(); buildPanel(); commit();
+}
+function pathColorAll() {
+  const s = byId(state.selectedId);
+  if (!s || s.type !== 'path') return;
+  const fill = s.pieces[state.selectedPiece].fill;
+  s.pieces.forEach(pc => { pc.fill = fill; });
+  render(); commit();
+}
+
+/* =====================================================================
+   History (undo / redo) + autosave
+   ===================================================================== */
+let history = [], hIndex = -1;
+const snapshot = () => JSON.stringify({ canvas: state.canvas, shapes: state.shapes });
+function updateUndoButtons() {
+  $('#btnUndo').disabled = hIndex <= 0;
+  $('#btnRedo').disabled = hIndex >= history.length - 1;
+}
+function resetHistory() { history = [snapshot()]; hIndex = 0; updateUndoButtons(); }
+function commit() {
+  const snap = snapshot();
+  if (snap === history[hIndex]) return;
+  history = history.slice(0, hIndex + 1);
+  history.push(snap);
+  if (history.length > 200) history.shift();
+  hIndex = history.length - 1;
+  state.dirty = true;
+  autosave();
+  updateUndoButtons();
+}
+function restoreSnapshot(snap) {
+  const o = JSON.parse(snap);
+  state.canvas = o.canvas; state.shapes = o.shapes;
+  if (!byId(state.selectedId)) state.selectedId = null;
+  creating = null;
+  render(); buildPanel();
+  state.dirty = true; autosave(); updateUndoButtons();
+}
+function undo() { if (hIndex > 0) restoreSnapshot(history[--hIndex]); }
+function redo() { if (hIndex < history.length - 1) restoreSnapshot(history[++hIndex]); }
+function autosave() {
+  try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(serialize())); } catch (_) { /* storage unavailable */ }
+}
+
+/* =====================================================================
+   Save / Load JSON
+   ===================================================================== */
+function serialize() {
+  return { app: APP_ID, version: FILE_VERSION, canvas: clone(state.canvas), shapes: clone(state.shapes) };
+}
+function stamp() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
+function saveJSON() {
+  // keep a snapped figure's long point list on one line instead of one number per line
+  const text = JSON.stringify(serialize(), null, 2)
+    .replace(/"points": \[[^\]]*\]/g, m => m.replace(/\s+/g, '').replace('"points":', '"points": '));
+  const blob = new Blob([text], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `flowchart-${stamp()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  state.dirty = false;
+  toast('Saved ' + a.download);
+}
+
+function normalizePath(s) {
+  if (!Array.isArray(s.points)) return false;
+  s.points = s.points.map(Number);
+  if (s.points.length < 4 || s.points.length % 2 || !s.points.every(isFinite)) return false;
+  s.cuts = (Array.isArray(s.cuts) ? s.cuts : []).map(Number).filter(c => isFinite(c) && c > 0 && c < 1)
+    .sort((a, b) => a - b).filter((c, i, a) => i === 0 || c !== a[i - 1]);
+  const need = s.closed ? Math.max(1, s.cuts.length) : s.cuts.length + 1;
+  const src = Array.isArray(s.pieces) ? s.pieces : [];
+  s.pieces = [];
+  for (let i = 0; i < need; i++) {
+    const pc = Object.assign(clone(PIECE_DEFAULTS), src[i] || src[src.length - 1] || {});
+    pc.fontSize = isFinite(+pc.fontSize) ? +pc.fontSize : 14;
+    pc.textOffset = isFinite(+pc.textOffset) ? +pc.textOffset : 50;
+    pc.bold = !!pc.bold; pc.flipText = !!pc.flipText; pc.text = String(pc.text ?? '');
+    pc.layer = isFinite(+pc.layer) ? +pc.layer : 0;
+    if (!['center', 'start', 'end'].includes(pc.textAlign)) pc.textAlign = 'center';
+    s.pieces.push(pc);
+  }
+  return true;
+}
+
+/** Validate + fill defaults so older or hand-edited files still load. */
+function normalizeDoc(obj) {
+  if (!obj || typeof obj !== 'object' || !Array.isArray(obj.shapes))
+    throw new Error('This file is not a FLOW-CHART-APP diagram (it has no "shapes" list).');
+  if (obj.app && obj.app !== APP_ID) throw new Error(`This file was made by "${obj.app}", not FLOW-CHART-APP.`);
+  if (obj.version > FILE_VERSION) console.warn(`File version ${obj.version} is newer than this app (${FILE_VERSION}); loading what is understood.`);
+  const canvas = Object.assign({ width: 1600, height: 900, background: '#FFFFFF' }, obj.canvas || {});
+  canvas.width = +canvas.width > 0 ? +canvas.width : 1600;
+  canvas.height = +canvas.height > 0 ? +canvas.height : 900;
+  const shapes = [], ids = new Set();
+  let skipped = 0;
+  obj.shapes.forEach((raw, i) => {
+    if (!raw || !DEFAULTS[raw.type]) { console.warn('Skipping unknown shape', raw); skipped++; return; }
+    const def = DEFAULTS[raw.type];
+    const s = Object.assign({ id: null, type: raw.type }, clone(def), raw);
+    for (const k in def) {
+      if (typeof def[k] === 'number') { s[k] = Number(s[k]); if (!isFinite(s[k])) s[k] = def[k]; }
+      else if (/^p[0-3]$/.test(k)) {
+        if (!Array.isArray(s[k]) || s[k].length !== 2 || !s[k].every(v => isFinite(+v))) s[k] = clone(def[k]);
+        else s[k] = s[k].map(Number);
+      }
+      else if (typeof def[k] === 'boolean') s[k] = !!s[k];
+    }
+    if ('textAlign' in def && !['center', 'start', 'end'].includes(s.textAlign)) s.textAlign = 'center';
+    if (s.type === 'item') {
+      if (s.icon && !ICONS[s.icon]) s.icon = 'cloud';
+      if (typeof s.image !== 'string' || !/^data:image\//.test(s.image)) s.image = null;
+    }
+    if (s.type === 'title' && !['left', 'center', 'right'].includes(s.align)) s.align = 'left';
+    for (const k of ['text', 'title', 'subtitle']) if (k in def) s[k] = String(s[k] ?? '');
+    if (s.type === 'path' && !normalizePath(s)) { console.warn('Skipping invalid snapped figure', raw); skipped++; return; }
+    let id = s.id == null ? '' : String(s.id);
+    if (!id || ids.has(id)) { let n = i; do { id = 'x' + n++; } while (ids.has(id)); }
+    s.id = id; ids.add(id);
+    if (typeof s.z !== 'number' || !isFinite(s.z)) s.z = i;
+    shapes.push(s);
+  });
+  const kept = shapes.filter(s => {
+    if (s.type !== 'arrow' || !s.parentId) return true;
+    const ok = shapes.some(p => p.id === s.parentId && isBand(p));
+    if (!ok) { console.warn('Skipping arrow with missing parent', s); skipped++; }
+    return ok;
+  });
+  return { canvas, shapes: kept, skipped };
+}
+function loadDoc(doc) {
+  state.canvas = doc.canvas;
+  state.shapes = doc.shapes;
+  state.nextId = 1 + state.shapes.reduce((m, s) => { const r = /^s(\d+)$/.exec(s.id); return r ? Math.max(m, +r[1]) : m; }, 0);
+  state.selectedId = null;
+  setTool('select');
+  render(); buildPanel(); resetHistory();
+  state.dirty = false;
+  autosave();
+  zoomToFit();
+}
+function confirmDiscard() { return !state.dirty || confirm('Discard the current diagram? Unsaved changes will be lost.'); }
+function openLoad() { if (confirmDiscard()) $('#fileInput').click(); }
+$('#fileInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const doc = normalizeDoc(JSON.parse(reader.result));
+      loadDoc(doc);
+      toast(`Loaded ${file.name}` + (doc.skipped ? ` (${doc.skipped} unknown item(s) skipped)` : ''));
+    } catch (err) {
+      toast(err instanceof SyntaxError ? 'That file is not valid JSON.' : err.message, true);
+    }
+  };
+  reader.onerror = () => toast('Could not read that file.', true);
+  reader.readAsText(file);
+});
+/* ---------- Trace image (background picture to draw over) ---------- */
+function openTrace() { $('#traceInput').click(); }
+$('#traceInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { toast('Please choose an image file (PNG, JPG, GIF, WebP or SVG).', true); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const probe = new Image();
+    probe.onload = () => {
+      state.trace = { src: reader.result, name: file.name, opacity: state.trace ? state.trace.opacity : 0.5 };
+      setTool('select');
+      selectShape(null);
+      renderPaper();
+      zoomToFit();
+      toast(`Showing ${file.name} as a background. Draw over it, then click Clear image.`);
+    };
+    probe.onerror = () => toast('That image could not be opened.', true);
+    probe.src = reader.result;
+  };
+  reader.onerror = () => toast('Could not read that file.', true);
+  reader.readAsDataURL(file);
+});
+function clearTrace() {
+  if (!state.trace) return;
+  state.trace = null;
+  renderPaper();
+  if (!state.selectedId) buildPanel();
+  toast('Background picture cleared');
+}
+
+function newDiagram() {
+  if (!confirmDiscard()) return;
+  loadDoc({ canvas: { width: 1600, height: 900, background: '#FFFFFF' }, shapes: [] });
+}
+
+/* =====================================================================
+   Example: a simplified "MLOps Eternal Knot"
+   ===================================================================== */
+function buildExample() {
+  const shapes = [];
+  let n = 1;
+  const add = (type, props) => {
+    const s = Object.assign({ id: 's' + (n++), type }, clone(DEFAULTS[type]), props);
+    s.z = shapes.length; shapes.push(s); return s;
+  };
+  const R = 100, TH = 40;
+  const rings = [
+    { c: [190, 440], fill: '#7B1E2B', name: 'Data', icon: 'cloud', labels: ['VALIDATE', 'TRANSFORM', 'CURATE', 'COLLECT'] },
+    { c: [470, 290], fill: '#5BA829', name: 'ML', icon: 'network', labels: ['EXPLORE', 'TRAIN', 'EVALUATE'] },
+    { c: [750, 440], fill: '#1F3F73', name: 'Dev', icon: 'code', labels: ['CODE', 'BUILD', 'TEST'] },
+    { c: [1030, 290], fill: '#E0A526', name: 'Ops', icon: 'gears', labels: ['DEPLOY', 'OPERATE', 'MONITOR'] }
+  ];
+  const links = [{ text: 'FORMULATE', fill: '#5BA829' }, { text: 'PLAN', fill: '#8A8F99' }, { text: 'RELEASE', fill: '#E0A526' }];
+  const on = (c, a) => [f(c[0] + R * Math.cos(rad(a))), f(c[1] + R * Math.sin(rad(a)))];
+
+  add('title', { x: 40, y: 30, title: 'MLOps: Eternal Knot', subtitle: 'Machine Learning Lifecycle' });
+
+  // connectors first, so the rings weave over them
+  links.forEach((lk, i) => {
+    const a = rings[i].c, b = rings[i + 1].c;
+    const ang = deg(Math.atan2(b[1] - a[1], b[0] - a[0]));
+    const s = add('bezier', Object.assign(bezierFrom(on(a, ang - 25), null, on(b, ang + 205), null),
+      { thickness: TH - 6, fill: lk.fill, text: lk.text, fontSize: 12 }));
+    s.flipText = autoFlip(s);
+  });
+
+  rings.forEach((rg, i) => {
+    const toward = rings[i + 1] || rings[i - 1];
+    const g = deg(Math.atan2(toward.c[1] - rg.c[1], toward.c[0] - rg.c[0]));
+    const dir = i % 2 === 0 ? 1 : -1, GAP = 70, total = 360 - GAP;
+    const start = g + dir * GAP / 2, seg = total / rg.labels.length;
+    let last;
+    rg.labels.forEach((lb, k) => {
+      const a0 = start + dir * (k * seg + (k ? 1.5 : 0));
+      const a1 = start + dir * ((k + 1) * seg - (k < rg.labels.length - 1 ? 1.5 : 0));
+      last = add('arc', { cx: rg.c[0], cy: rg.c[1], r: R, startAngle: f(a0), endAngle: f(a1), thickness: TH, fill: rg.fill, text: lb, fontSize: 13 });
+      last.flipText = autoFlip(last);
+    });
+    add('arrow', { parentId: last.id, t: 1, style: 'chevron', width: TH * 1.6, length: TH * 0.8, fill: rg.fill });
+    add('item', { x: rg.c[0], y: rg.c[1], icon: rg.icon, iconSize: 50, iconColor: rg.fill, text: rg.name, textColor: rg.fill, fontSize: 24 });
+    add('circle', { cx: f(rg.c[0] - R - 30), cy: f(rg.c[1] + R + 10), r: 16, fill: '#FFFFFF', stroke: rg.fill, strokeWidth: 2.5, text: String(i + 1), textColor: rg.fill, fontSize: 15 });
+  });
+  return { app: APP_ID, version: FILE_VERSION, canvas: { width: 1220, height: 620, background: '#FFFFFF' }, shapes };
+}
+
+/* =====================================================================
+   Toast, toolbar, keyboard, startup
+   ===================================================================== */
+let toastTimer = null;
+function toast(msg, error = false) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'show' + (error ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = ''; }, error ? 5000 : 2600);
+}
+
+document.querySelectorAll('[data-tool]').forEach(b => b.addEventListener('click', () => { setTool(b.dataset.tool); b.blur(); }));
+const onClick = (id, fn) => $(id).addEventListener('click', e => { e.currentTarget.blur(); fn(); });
+onClick('#btnNew', newDiagram);
+onClick('#btnLoad', openLoad);
+onClick('#btnSave', saveJSON);
+onClick('#btnExample', () => { if (confirmDiscard()) { loadDoc(normalizeDoc(buildExample())); state.dirty = true; } });
+onClick('#btnSnap', snapIt);
+onClick('#btnTrace', openTrace);
+onClick('#btnClearTrace', clearTrace);
+onClick('#btnUndo', undo);
+onClick('#btnRedo', redo);
+onClick('#btnZoomIn', () => zoomCenter(1.25));
+onClick('#btnZoomOut', () => zoomCenter(0.8));
+onClick('#zoomLabel', zoomToFit);
+
+/* ---------- Welcome box: shown on every page load, dismissed with Enter ---------- */
+const welcome = $('#welcome');
+function dismissWelcome() { welcome.hidden = true; }
+$('#welcomeStart').addEventListener('click', dismissWelcome);
+
+document.addEventListener('keydown', e => {
+  if (!welcome.hidden) {
+    // while the welcome box is open, only Enter does anything
+    if (e.key === 'Enter') { e.preventDefault(); dismissWelcome(); }
+    else if (e.ctrlKey || e.metaKey) e.preventDefault();
+    return;
+  }
+  const ae = document.activeElement;
+  const inField = ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);
+  const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (mod && k === 's') { e.preventDefault(); saveJSON(); return; }
+  if (mod && k === 'o') { e.preventDefault(); openLoad(); return; }
+  if (inField) { if (e.key === 'Escape') ae.blur(); return; }
+  if (mod && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && k === 'y') { e.preventDefault(); redo(); return; }
+  if (mod && k === 'd') { e.preventDefault(); duplicateSelected(); return; }
+  if (mod || e.altKey) return;
+  if (e.key === ' ') { e.preventDefault(); if (!spaceDown) { spaceDown = true; svg.classList.add('space'); } return; }
+  if (e.key === 'Escape') { if (creating) cancelCreate(); else selectShape(null); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); return; }
+  const step = e.shiftKey ? 10 : 1;
+  const arrows = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+  if (arrows[e.key]) { e.preventDefault(); nudge(...arrows[e.key]); return; }
+  const tools = { v: 'select', a: 'arc', b: 'bezier', r: 'arrow', t: 'text', c: 'circle', i: 'item', h: 'title' };
+  if (tools[k]) { setTool(tools[k]); return; }
+  if (k === 's') { snapIt(); return; }
+  if (k === 'f') zoomToFit();
+});
+document.addEventListener('keyup', e => { if (e.key === ' ') { spaceDown = false; svg.classList.remove('space'); } });
+window.addEventListener('blur', () => { spaceDown = false; svg.classList.remove('space'); });
+
+(function start() {
+  setTool('select');
+  let restored = false;
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    if (raw) {
+      const doc = normalizeDoc(JSON.parse(raw));
+      if (doc.shapes.length) { loadDoc(doc); state.dirty = true; restored = true; toast('Restored your last session'); }
+    }
+  } catch (_) { /* no or bad autosave */ }
+  if (!restored) { render(); buildPanel(); resetHistory(); requestAnimationFrame(zoomToFit); }
+})();
+</script>
+</body>
+</html>
