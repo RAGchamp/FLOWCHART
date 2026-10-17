@@ -32,9 +32,83 @@
   }
   #app {
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: auto auto 1fr auto;
     grid-template-columns: 1fr 290px;
     height: 100vh;
+  }
+
+  /* ---------- Site nav (matches INFO/guide.html) ---------- */
+  #sitenav {
+    grid-column: 1 / -1;
+    background: #04264d; color: #ffd60a;
+    padding: .9rem 1.5rem;
+    display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+    border: 2px solid #ffd60a;
+    box-shadow: 0 .15rem .5rem rgba(0,0,0,.25);
+    position: relative; z-index: 2;
+  }
+  #sitenav .site-brand { display: inline-flex; align-items: center; text-decoration: none; }
+  #sitenav .site-logo { height: 44px; width: auto; display: block; }
+  #sitenav .site-links { display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; }
+  #sitenav .site-links a {
+    color: #ffd60a; text-decoration: none; font-weight: 600; font-size: 1rem; white-space: nowrap;
+  }
+  #sitenav .site-links a:hover { text-decoration: underline; }
+  #sitenav .site-tagline {
+    font-weight: 600; font-size: 1.05rem; color: #ffd60a;
+    letter-spacing: .15em; word-spacing: .6em; font-style: italic;
+  }
+  #sitenav .site-tagline { white-space: nowrap; }
+  #sitenav .site-right { display: flex; align-items: center; gap: 1rem; }
+  /* bright call-to-action so new users can see a finished diagram in one click */
+  #btnSample {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #5BF527; color: #04264d; border: 2px solid #ffd60a; border-radius: 999px;
+    padding: .4rem 1rem; font: inherit; font-weight: 700; font-size: .95rem; cursor: pointer; white-space: nowrap;
+    box-shadow: 0 0 0 0 rgba(91,245,39,.6); animation: samplePulse 2.4s ease-out 3;
+  }
+  #btnSample:hover { background: #7dff52; }
+  #btnSample:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  #btnSample:disabled { opacity: .6; cursor: wait; }
+  #btnSample svg { width: 16px; height: 16px; }
+  @keyframes samplePulse { 70% { box-shadow: 0 0 0 10px rgba(91,245,39,0); } 100% { box-shadow: 0 0 0 0 rgba(91,245,39,0); } }
+  #btnMenu {
+    display: none; background: transparent; border: 1px solid rgba(255,214,10,.5); border-radius: 6px;
+    color: #ffd60a; width: 34px; height: 34px; padding: 0; cursor: pointer; align-items: center; justify-content: center;
+  }
+  #btnMenu svg { width: 20px; height: 20px; }
+  #btnMenu:hover, #btnMenu[aria-expanded="true"] { background: rgba(255,214,10,.15); }
+  @media (max-width: 1100px) {
+    #sitenav { padding: .6rem 1rem; }
+    #sitenav .site-logo { height: 36px; }
+    #sitenav .site-links { gap: 1rem; }
+    #sitenav .site-links a { font-size: .9rem; }
+    #sitenav .site-tagline { font-size: .9rem; letter-spacing: .08em; word-spacing: .3em; }
+  }
+  @media (max-width: 1280px) {
+    #sitenav .site-tagline { display: none; }
+  }
+  @media (max-width: 860px) {
+    /* links fold into the ⋮ menu: logo · Show sample · ⋮ on one short row */
+    #sitenav { padding: .4rem .75rem; }
+    #sitenav .site-logo { height: 30px; }
+    #btnMenu { display: inline-flex; }
+    #sitenav .site-links {
+      display: none; position: absolute; top: 100%; right: 0; z-index: 20;
+      flex-direction: column; gap: 0; min-width: 190px;
+      background: #04264d; border: 2px solid #ffd60a; border-top: none; border-radius: 0 0 0 8px;
+      box-shadow: 0 .4rem .8rem rgba(0,0,0,.3);
+    }
+    #sitenav.menu-open .site-links { display: flex; }
+    #sitenav .site-links a { padding: .65rem 1rem; font-size: .95rem; }
+    #sitenav .site-links a + a { border-top: 1px solid rgba(255,214,10,.25); }
+    #sitenav .site-links a:hover { background: rgba(255,214,10,.12); text-decoration: none; }
+    #sitenav .site-right { gap: .5rem; }
+    #btnSample { padding: .3rem .8rem; font-size: .85rem; }
+  }
+  @media (max-width: 360px) {
+    #sitenav .site-logo { height: 26px; }
+    #btnSample svg { display: none; }
   }
 
   /* ---------- Top nav ---------- */
@@ -42,7 +116,8 @@
     grid-column: 1 / -1;
     display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
     padding: 6px 10px;
-    background: var(--nav-bg); color: var(--nav-fg); border-bottom: 1px solid #0b3d20;
+    background: var(--nav-bg); color: var(--nav-fg);
+    border: 2px solid #ffd60a; border-top: none;  /* sitenav's bottom border separates the two bars */
   }
   .brand { font-weight: 700; letter-spacing: .02em; margin-right: 8px; white-space: nowrap; }
   .group { display: flex; gap: 4px; padding-right: 8px; margin-right: 2px; border-right: 1px solid rgba(250,204,21,.35); }
@@ -180,14 +255,43 @@
   #hint { overflow: hidden; text-overflow: ellipsis; }
 
   @media (max-width: 800px) {
-    #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr 40vh auto; }
-    #panel { border-left: none; border-top: 1px solid var(--border); }
+    /* stack vertically and let the page scroll: canvas fills the screen, properties sit below it */
+    #app { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto auto; height: auto; min-height: 100vh; }
+    /* scroll mode: the svg is sized to the paper (see layoutScroll) and the stage scrolls */
+    #stage { height: max(360px, calc(100vh - 110px)); overflow: auto; }
+    #panel { border-left: none; border-top: 1px solid var(--border); overflow: visible; }
     .tb .lbl { display: none; }
+    /* toolbar stays one row and scrolls sideways instead of wrapping */
+    #topbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+    .group { flex: none; }
   }
 </style>
 </head>
 <body>
 <div id="app">
+  <!-- =================== SITE NAV =================== -->
+  <nav id="sitenav">
+    <span class="site-brand">
+      <svg class="site-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 48" role="img" aria-label="RAG Champ logo">
+        <circle cx="24" cy="24" r="19" fill="#5BF527"/>
+        <path d="M24,5 A19,19 0 0,0 24,43 A9.5,9.5 0 0,0 24,24 A9.5,9.5 0 0,1 24,5 Z" fill="#FA0C00"/>
+        <text x="58" y="33" font-family="'Segoe UI', Verdana, Arial, sans-serif" font-weight="700" font-size="26" letter-spacing="0.3" fill="#ffd60a">RAG Champ</text>
+      </svg>
+    </span>
+    <div class="site-links" id="siteLinks">
+      <a href="https://ragchamp.github.io/FLOWCHART/guide.html" target="_blank" rel="noopener">User Guide</a>
+      <a href="https://ragchamp.github.io/FLOWCHART/sample-json.json" target="_blank" rel="noopener">Sample JSON</a>
+      <a href="https://ragchamp.github.io/FLOWCHART/Sample-flow-diag.jpg" target="_blank" rel="noopener">Sample Flow Diag</a>
+      <a href="https://ragchamp.github.io/FLOWCHART/contactus.html" target="_blank" rel="noopener">Contact Us</a>
+    </div>
+    <div class="site-right">
+      <button id="btnSample" type="button" title="Load a finished sample diagram to explore">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>Show sample</button>
+      <div class="site-tagline">FLOW CHART BUILDER</div>
+      <button id="btnMenu" type="button" aria-label="More links" aria-expanded="false" aria-controls="siteLinks">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
+    </div>
+  </nav>
   <!-- =================== TOP NAV =================== -->
   <header id="topbar">
     <span class="brand">FLOW-CHART-APP</span>
@@ -899,6 +1003,8 @@ function moveWithSnap(s, o, dx, dy, e) {
    Rendering
    ===================================================================== */
 const svg = $('#canvas'), world = $('#world'), shapesLayer = $('#shapesLayer'), overlay = $('#overlayLayer');
+const stage = $('#stage'), narrowMQ = matchMedia('(max-width: 800px)');
+const SCROLL_PAD = 24;
 const panel = $('#panel');
 
 /**
@@ -1089,6 +1195,7 @@ function renderPaper() {
   paper.setAttribute('width', width); paper.setAttribute('height', height); paper.setAttribute('fill', background);
   grid.setAttribute('width', width); grid.setAttribute('height', height);
   grid.style.display = state.showGrid ? '' : 'none';
+  if (scrollMode()) { layoutScroll(); world.setAttribute('transform', `translate(${view.x} ${view.y}) scale(${view.k})`); }
   // background picture for tracing: fitted inside the canvas, under all shapes
   const img = $('#traceImg');
   if (state.trace) {
@@ -1226,7 +1333,20 @@ function renderOverlay() {
 /* =====================================================================
    View: pan & zoom
    ===================================================================== */
+// Narrow screens use "scroll mode": the svg grows to fit the paper at the current
+// zoom and #stage scrolls natively, so the paper's edges can always be reached.
+function scrollMode() { return narrowMQ.matches; }
+function layoutScroll() {
+  const k = view.k, pw = state.canvas.width * k, ph = state.canvas.height * k;
+  const sw = stage.clientWidth, sh = stage.clientHeight;
+  svg.style.width = Math.max(sw, pw + 2 * SCROLL_PAD) + 'px';
+  svg.style.height = Math.max(sh, ph + 2 * SCROLL_PAD) + 'px';
+  view.x = Math.max(SCROLL_PAD, (sw - pw) / 2);
+  view.y = Math.max(SCROLL_PAD, (sh - ph) / 2);
+}
 function applyView() {
+  if (scrollMode()) layoutScroll();
+  else { svg.style.width = svg.style.height = ''; }
   world.setAttribute('transform', `translate(${view.x} ${view.y}) scale(${view.k})`);
   $('#zoomLabel').textContent = Math.round(view.k * 100) + '%';
   renderOverlay();
@@ -1235,11 +1355,22 @@ function zoomAt(factor, sx, sy) {
   const k = clamp(view.k * factor, 0.1, 8);
   const wx = (sx - view.x) / view.k, wy = (sy - view.y) / view.k;
   view.k = k; view.x = sx - wx * k; view.y = sy - wy * k;
+  if (scrollMode()) {
+    // keep the point under the cursor fixed by scrolling the stage after the resize
+    const ox = sx - stage.scrollLeft, oy = sy - stage.scrollTop;
+    applyView();
+    stage.scrollLeft = view.x + wx * k - ox;
+    stage.scrollTop = view.y + wy * k - oy;
+    return;
+  }
   applyView();
 }
-function zoomCenter(factor) { const r = svg.getBoundingClientRect(); zoomAt(factor, r.width / 2, r.height / 2); }
+function zoomCenter(factor) {
+  if (scrollMode()) return zoomAt(factor, stage.scrollLeft + stage.clientWidth / 2, stage.scrollTop + stage.clientHeight / 2);
+  const r = svg.getBoundingClientRect(); zoomAt(factor, r.width / 2, r.height / 2);
+}
 function zoomToFit() {
-  const r = svg.getBoundingClientRect();
+  const r = scrollMode() ? { width: stage.clientWidth, height: stage.clientHeight } : svg.getBoundingClientRect();
   let x0 = 0, y0 = 0, x1 = state.canvas.width, y1 = state.canvas.height;
   if (state.shapes.length) {
     try {
@@ -1571,7 +1702,7 @@ function cancelCreate() {
 
 /* ---------- Pointer wiring ---------- */
 function startPan(e) {
-  drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, ox: view.x, oy: view.y };
+  drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, ox: view.x, oy: view.y, sl: stage.scrollLeft, st: stage.scrollTop };
   svg.classList.add('panning');
 }
 svg.addEventListener('pointerdown', e => {
@@ -1586,6 +1717,10 @@ svg.addEventListener('pointermove', e => {
   const p = toWorld(e);
   $('#coords').textContent = `x ${Math.round(p[0])}, y ${Math.round(p[1])} · ${Math.round(view.k * 100)}%`;
   if (drag && drag.kind === 'pan') {
+    if (scrollMode()) {
+      stage.scrollLeft = drag.sl - (e.clientX - drag.sx); stage.scrollTop = drag.st - (e.clientY - drag.sy);
+      return;
+    }
     view.x = drag.ox + e.clientX - drag.sx; view.y = drag.oy + e.clientY - drag.sy;
     applyView(); return;
   }
@@ -1605,14 +1740,17 @@ svg.addEventListener('pointerup', pointerEnd);
 svg.addEventListener('pointercancel', pointerEnd);
 svg.addEventListener('pointerleave', () => { if (hover) { hover = null; renderOverlay(); } });
 svg.addEventListener('wheel', e => {
+  if (scrollMode() && !e.ctrlKey) return; // plain wheel scrolls the stage; ctrl+wheel zooms
   e.preventDefault();
   const r = svg.getBoundingClientRect();
   zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
 }, { passive: false });
+narrowMQ.addEventListener('change', () => zoomToFit());
+window.addEventListener('resize', () => { if (scrollMode()) applyView(); });
 svg.addEventListener('dblclick', e => {
-  // double-click a band in Select mode to jump to its text field
+  // double-click a shape in Select mode to jump to its text field (a piece's text, or a title)
   if (state.tool === 'select' && byId(state.selectedId)) {
-    const i = panel.querySelector('[data-prop="text"]');
+    const i = panel.querySelector('[data-prop="text"], [data-prop$=".text"], [data-prop="title"]');
     if (i) { i.focus(); i.select(); }
   }
 });
@@ -2196,6 +2334,31 @@ const onClick = (id, fn) => $(id).addEventListener('click', e => { e.currentTarg
 onClick('#btnNew', newDiagram);
 onClick('#btnLoad', openLoad);
 onClick('#btnSave', saveJSON);
+const SAMPLE_URL = 'https://ragchamp.github.io/FLOWCHART/sample-json.json';
+onClick('#btnSample', async () => {
+  if (!confirmDiscard()) return;
+  const btn = $('#btnSample');
+  btn.disabled = true;
+  try {
+    const res = await fetch(SAMPLE_URL, { cache: 'no-cache' });
+    if (!res.ok) throw new Error(`Could not download the sample (HTTP ${res.status}).`);
+    const doc = normalizeDoc(await res.json());
+    loadDoc(doc);
+    toast('Sample loaded. Click any shape to change its text or color.');
+  } catch (err) {
+    toast(err instanceof SyntaxError ? 'The sample file is not valid JSON.'
+      : err instanceof TypeError ? 'Could not reach the sample. Check your internet connection.' : err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+/* ---------- ⋮ menu for the site links on narrow screens ---------- */
+const sitenav = $('#sitenav'), btnMenu = $('#btnMenu');
+function setMenu(open) { sitenav.classList.toggle('menu-open', open); btnMenu.setAttribute('aria-expanded', open); }
+btnMenu.addEventListener('click', e => { e.stopPropagation(); setMenu(!sitenav.classList.contains('menu-open')); });
+$('#siteLinks').addEventListener('click', () => setMenu(false));
+document.addEventListener('click', e => { if (!sitenav.contains(e.target)) setMenu(false); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
 onClick('#btnExample', () => { if (confirmDiscard()) { loadDoc(normalizeDoc(buildExample())); state.dirty = true; } });
 onClick('#btnSnap', snapIt);
 onClick('#btnTrace', openTrace);
