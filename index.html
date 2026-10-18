@@ -172,6 +172,8 @@
   #canvas.panning, #canvas.panning * { cursor: grabbing !important; }
   #canvas.tool-select .shape { cursor: move; }
   #paper { filter: drop-shadow(0 1px 3px rgba(0,0,0,.15)); }
+  /* Arial looks the same in PowerPoint and Google Slides, so exported labels line up with the canvas */
+  #shapesLayer text { font-family: Arial, Helvetica, sans-serif; }
   #overlayLayer * { pointer-events: none; }
   #overlayLayer .handle { pointer-events: all; cursor: pointer; }
   .ov-sel { fill: none; stroke: var(--sel); }
@@ -271,6 +273,22 @@
   }
   #hint { overflow: hidden; text-overflow: ellipsis; }
 
+  /* ---------- Export dialog ---------- */
+  #exportDlg {
+    width: min(440px, calc(100vw - 32px)); padding: 20px 24px; border: 2px solid var(--welcome-border); border-radius: 12px;
+    background: var(--welcome-bg); color: #14532d; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  }
+  #exportDlg::backdrop { background: rgba(20,83,45,.25); }
+  #exportDlg h2 { margin: 0 0 10px; font-size: 20px; }
+  .xrow { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 10px; margin: 8px 0; }
+  .xrow[hidden], .xnote[hidden] { display: none; }
+  .xrow > span { font-weight: 600; }
+  .xrow select { width: 100%; padding: 6px 8px; border: 1px solid var(--welcome-border); border-radius: 6px; font: inherit; background: #fff; color: var(--text); }
+  .xnote { font-size: 12px; line-height: 1.5; margin: 8px 0; }
+  .xbtns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .xbtns button { padding: 7px 16px; border: none; border-radius: 6px; background: var(--nav-bg); color: var(--nav-fg); font: inherit; font-weight: 600; cursor: pointer; }
+  .xbtns button.secondary { background: transparent; color: var(--nav-bg); border: 2px solid var(--nav-bg); padding: 5px 14px; }
+
   @media (max-width: 800px) {
     /* stack vertically and let the page scroll: canvas fills the screen, properties sit below it */
     #app { grid-template-columns: 1fr; grid-template-rows: auto auto auto auto auto; height: auto; min-height: 100vh; }
@@ -342,6 +360,8 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6h6l2 2h10v11H3z"/></svg><span class="lbl">Load JSON</span></button>
       <button class="tb" id="btnSave" title="Save JSON (Ctrl+S)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M4 19h16"/></svg><span class="lbl">Save JSON</span></button>
+      <button class="tb" id="btnExport" title="Export to PowerPoint (.pptx), PNG or SVG (Ctrl+E)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="1.5"/><path d="M12 17v4M8 21h8M7 13l3-3 2 2 4-4"/></svg><span class="lbl">Export</span></button>
       <button class="tb" id="btnExample" title="Load an example diagram">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="12" r="5"/><circle cx="16" cy="12" r="5"/></svg><span class="lbl">Example</span></button>
     </div>
@@ -396,6 +416,7 @@
           <li><b>Icon</b>: put an icon with a label inside a loop, such as a cloud with "Data". <b>Title</b>: add a heading and subtitle.</li>
           <li>Click any shape, then use the panel on the right to change its <b>color</b>, <b>text</b> and size.</li>
           <li><b>Save JSON</b> downloads your diagram. <b>Load JSON</b> opens it again later.</li>
+          <li><b>Export</b>: download the diagram as an editable <b>PowerPoint</b> file (it also opens in Google Slides), or as a PNG or SVG picture.</li>
           <li><b>Snap it</b>: closes the gaps between your bands and joins them into one figure in a single color. Then click on it with <b>Arrow</b> wherever you want arrows. Each part between arrows becomes its own piece, with its own color and text.</li>
           <li><b>Trace image</b>: upload a picture of a flowchart to show it behind the canvas and draw over it. <b>Clear image</b> removes it when you're done.</li>
         </ol>
@@ -415,6 +436,32 @@
   <!-- =================== STATUS BAR =================== -->
   <footer id="status"><span id="hint"></span><span id="coords"></span></footer>
 </div>
+
+<!-- =================== EXPORT DIALOG =================== -->
+<dialog id="exportDlg" aria-labelledby="exportTitle">
+  <form method="dialog" id="exportForm">
+    <h2 id="exportTitle">Export</h2>
+    <label class="xrow"><span>Format</span><select name="format">
+      <option value="pptx">PowerPoint (.pptx)</option><option value="png">PNG picture</option><option value="svg">SVG picture</option></select></label>
+    <label class="xrow" data-for="pptx"><span>Content</span><select name="content">
+      <option value="editable">Editable shapes</option><option value="picture">Picture</option><option value="both">Both (2 slides)</option></select></label>
+    <label class="xrow" data-for="pptx"><span>Slide size</span><select name="slide">
+      <option value="16:9">16:9 widescreen</option><option value="4:3">4:3 standard</option><option value="match">Match the diagram</option></select></label>
+    <label class="xrow" data-for="pptx png svg"><span>Area</span><select name="area">
+      <option value="fit">Fit to diagram</option><option value="canvas">Whole canvas</option></select></label>
+    <label class="xrow" data-for="pptx" data-content="editable both"><span>Labels</span><select name="labels">
+      <option value="auto">Auto</option><option value="straight">Straight (easiest to edit)</option><option value="letters">Letter by letter (follows the curve)</option></select></label>
+    <label class="xrow" data-for="pptx" data-content="editable both"><span>Font</span><select name="font">
+      <option value="Arial">Arial</option><option value="Calibri">Calibri</option><option value="Segoe UI">Segoe UI</option></select></label>
+    <label class="xrow" data-for="pptx" data-content="picture both"><span>Picture</span><select name="pictureScale">
+      <option value="2">2× resolution</option><option value="3">3× resolution</option></select></label>
+    <label class="xrow" data-for="png"><span>Resolution</span><select name="pngScale">
+      <option value="1">1× (canvas size)</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option></select></label>
+    <p class="xnote" data-for="pptx">Opens in PowerPoint. For <b>Google Slides</b>, upload the file to Google Drive and open it with Google Slides, or use <b>File › Import slides</b> in an open deck.</p>
+    <p class="xnote" data-for="pptx" data-content="editable both"><b>Auto</b> labels use one text box when the band is gently curved and one box per letter on tight curves.</p>
+    <div class="xbtns"><button value="cancel" class="secondary" formnovalidate>Cancel</button><button value="ok" id="exportGo">Download</button></div>
+  </form>
+</dialog>
 
 <script>
 'use strict';
@@ -2192,14 +2239,10 @@ function saveJSON() {
   // keep a snapped figure's long point list on one line instead of one number per line
   const text = JSON.stringify(serialize(), null, 2)
     .replace(/"points": \[[^\]]*\]/g, m => m.replace(/\s+/g, '').replace('"points":', '"points": '));
-  const blob = new Blob([text], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `flowchart-${stamp()}.json`;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  const name = `flowchart-${stamp()}.json`;
+  download(new Blob([text], { type: 'application/json' }), name);
   state.dirty = false;
-  toast('Saved ' + a.download);
+  toast('Saved ' + name);
 }
 
 function normalizePath(s) {
@@ -2336,6 +2379,618 @@ function newDiagram() {
 }
 
 /* =====================================================================
+   Export: PowerPoint (.pptx), PNG and SVG
+   The .pptx is written by hand (OOXML parts + a small zip writer), so the app keeps
+   working offline with no libraries. Design notes: INFO/PPT-EXTENSION-PLAN.md.
+   ===================================================================== */
+const EXPORT_PREFS_KEY = 'flow-chart-app:export';
+const EXPORT_DEFAULTS = { format: 'pptx', content: 'editable', slide: '16:9', area: 'fit', labels: 'auto', font: 'Arial', pictureScale: 3, pngScale: 2 };
+const EXPORT_FONTS = ['Arial', 'Calibri', 'Segoe UI'];
+const SLIDE_W = 12192000;                                   // 13.333 in, in EMU
+const SLIDE_SIZES = { '16:9': [SLIDE_W, 6858000], '4:3': [9144000, 6858000] };
+const EMU_PER_PT = 12700, EMU_PER_SCREEN_PX = 9525;
+const AREA_MARGIN = 24;          // canvas px around the diagram for "Fit to diagram"
+const STRAIGHT_LABEL_MAX = 20;   // Auto labels: one text box when the letters turn by at most this many degrees
+const MAX_RASTER_SIDE = 8000;    // largest PNG side, in pixels
+
+function download(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+/** The part of the canvas to export, in canvas px: the whole paper, or the diagram's bounds plus a margin. */
+function exportArea(mode) {
+  const { width, height } = state.canvas;
+  let b = null;
+  if (mode === 'fit') try { b = shapesLayer.getBBox(); } catch (_) { /* not measurable */ }
+  if (!b || !b.width || !b.height) return { x: 0, y: 0, w: width, h: height };
+  return { x: b.x - AREA_MARGIN, y: b.y - AREA_MARGIN, w: b.width + 2 * AREA_MARGIN, h: b.height + 2 * AREA_MARGIN };
+}
+/** Slide size in EMU. "match" keeps the diagram's shape with the long side at 13.333 in. */
+function slideSize(kind, area) {
+  if (SLIDE_SIZES[kind]) return SLIDE_SIZES[kind];
+  const r = area.h / area.w;
+  return r <= 1 ? [SLIDE_W, Math.max(914400, Math.round(SLIDE_W * r))] : [Math.max(914400, Math.round(SLIDE_W / r)), SLIDE_W];
+}
+/** Canvas px → slide EMU: scale the area to fit the slide and center it. */
+function makeTransform(area, sw, sh) {
+  const k = Math.min(sw / area.w, sh / area.h);
+  const ox = (sw - area.w * k) / 2 - area.x * k, oy = (sh - area.h * k) / 2 - area.y * k;
+  return { k, pt: k / EMU_PER_PT, x: v => Math.round(ox + v * k), y: v => Math.round(oy + v * k), len: v => Math.max(0, Math.round(v * k)) };
+}
+
+/* ---------- SVG and PNG ---------- */
+/** A standalone SVG of the diagram (no grid, tracing picture or selection handles). */
+function exportSvgMarkup(area) {
+  render();
+  const out = document.createElementNS(NS, 'svg');
+  out.setAttribute('width', f(area.w)); out.setAttribute('height', f(area.h));
+  out.setAttribute('viewBox', `${f(area.x)} ${f(area.y)} ${f(area.w)} ${f(area.h)}`);
+  el('style', {}, out).textContent = 'text { font-family: Arial, Helvetica, sans-serif; }';
+  el('rect', { x: f(area.x), y: f(area.y), width: f(area.w), height: f(area.h), fill: state.canvas.background }, out);
+  const layer = shapesLayer.cloneNode(true);
+  layer.removeAttribute('id');
+  layer.querySelectorAll('g.hit-box > rect[fill-opacity="0"]').forEach(r => r.remove());
+  out.appendChild(layer);
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(out);
+}
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error('A picture in the diagram could not be drawn.'));
+    im.src = src;
+  });
+}
+function drawToPng(img, w, h, box) {
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h));
+  const b = box || [0, 0, c.width, c.height];
+  c.getContext('2d').drawImage(img, b[0], b[1], b[2], b[3]);
+  return new Promise((resolve, reject) => c.toBlob(bl => bl ? resolve(bl) : reject(new Error('Could not create the PNG image.')), 'image/png'));
+}
+async function svgToPng(svgText, w, h) {
+  const img = await loadImage('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgText));
+  return drawToPng(img, w, h);
+}
+const rasterScale = (area, want) => Math.max(0.1, Math.min(want, MAX_RASTER_SIDE / Math.max(area.w, area.h)));
+const blobBytes = async b => new Uint8Array(await b.arrayBuffer());
+
+/* ---------- Zip (store or deflate, no library) ---------- */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 255] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+async function deflateRaw(bytes) {
+  if (typeof CompressionStream !== 'function') return null;
+  try {
+    const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  } catch (_) { return null; }
+}
+/** files: [{ name, data: string | Uint8Array }] → zip Blob. */
+async function zipFiles(files, type) {
+  const enc = new TextEncoder(), parts = [], central = [], d = new Date();
+  const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  const date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  let offset = 0;
+  for (const file of files) {
+    const name = enc.encode(file.name), raw = typeof file.data === 'string' ? enc.encode(file.data) : file.data;
+    const crc = crc32(raw), z = await deflateRaw(raw), packed = z && z.length < raw.length;
+    const body = packed ? z : raw, method = packed ? 8 : 0;
+    const head = new DataView(new ArrayBuffer(30));
+    head.setUint32(0, 0x04034b50, true); head.setUint16(4, 20, true); head.setUint16(6, 0, true);
+    head.setUint16(8, method, true); head.setUint16(10, time, true); head.setUint16(12, date, true);
+    head.setUint32(14, crc, true); head.setUint32(18, body.length, true); head.setUint32(22, raw.length, true);
+    head.setUint16(26, name.length, true); head.setUint16(28, 0, true);
+    parts.push(head, name, body);
+    const cd = new DataView(new ArrayBuffer(46));
+    cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true); cd.setUint16(8, 0, true);
+    cd.setUint16(10, method, true); cd.setUint16(12, time, true); cd.setUint16(14, date, true);
+    cd.setUint32(16, crc, true); cd.setUint32(20, body.length, true); cd.setUint32(24, raw.length, true);
+    cd.setUint16(28, name.length, true); cd.setUint32(42, offset, true);
+    central.push(cd, name);
+    offset += 30 + name.length + body.length;
+  }
+  const cdSize = central.reduce((n, p) => n + p.byteLength, 0), end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end], { type });
+}
+
+/* ---------- OOXML parts ---------- */
+const PPTX_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+const XML_HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const NS_P = 'http://schemas.openxmlformats.org/presentationml/2006/main';
+const PML = `xmlns:a="${NS_A}" xmlns:r="${NS_R}" xmlns:p="${NS_P}"`;
+const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
+const CT = 'application/vnd.openxmlformats-officedocument.';
+const EMPTY_TREE = '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
+  '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
+
+const xmlText = s => String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, '')
+  .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function hexColor(c) {
+  let h = String(c || '').trim().replace(/^#/, '');
+  if (/^[0-9a-f]{3}$/i.test(h)) h = h.replace(/./g, x => x + x);
+  return /^[0-9a-f]{6}$/i.test(h) ? h.toUpperCase() : '000000';
+}
+const solidFill = (c, opacity = 1) => `<a:solidFill><a:srgbClr val="${hexColor(c)}">` +
+  (opacity < 1 ? `<a:alpha val="${Math.round(clamp(opacity, 0, 1) * 100000)}"/>` : '') + '</a:srgbClr></a:solidFill>';
+const angle60k = a => Math.round((((a % 360) + 360) % 360) * 60000) % 21600000;
+const rels = list => XML_HEAD + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+  list.map(r => `<Relationship Id="${r.id}" Type="${r.type}" Target="${r.target}"/>`).join('') + '</Relationships>';
+
+function themeXml(font) {
+  const fontXml = `<a:latin typeface="${xmlText(font)}"/><a:ea typeface=""/><a:cs typeface=""/>`;
+  const accents = PALETTE.slice(0, 6).map((c, i) => `<a:accent${i + 1}><a:srgbClr val="${hexColor(c)}"/></a:accent${i + 1}>`).join('');
+  const three = x => x + x + x;
+  return XML_HEAD + `<a:theme xmlns:a="${NS_A}" name="Flow Chart Builder"><a:themeElements>` +
+    '<a:clrScheme name="Flow Chart Builder"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1>' +
+    `<a:dk2><a:srgbClr val="1F2328"/></a:dk2><a:lt2><a:srgbClr val="E7E6E6"/></a:lt2>${accents}` +
+    '<a:hlink><a:srgbClr val="2563EB"/></a:hlink><a:folHlink><a:srgbClr val="6D28D9"/></a:folHlink></a:clrScheme>' +
+    `<a:fontScheme name="Flow Chart Builder"><a:majorFont>${fontXml}</a:majorFont><a:minorFont>${fontXml}</a:minorFont></a:fontScheme>` +
+    '<a:fmtScheme name="Flow Chart Builder">' +
+    `<a:fillStyleLst>${three('<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>')}</a:fillStyleLst>` +
+    `<a:lnStyleLst>${three('<a:ln w="6350"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln>')}</a:lnStyleLst>` +
+    `<a:effectStyleLst>${three('<a:effectStyle><a:effectLst/></a:effectStyle>')}</a:effectStyleLst>` +
+    `<a:bgFillStyleLst>${three('<a:solidFill><a:schemeClr val="phClr"/></a:solidFill>')}</a:bgFillStyleLst>` +
+    '</a:fmtScheme></a:themeElements><a:objectDefaults/><a:extraClrSchemeLst/></a:theme>';
+}
+const MASTER_XML = XML_HEAD + `<p:sldMaster ${PML}><p:cSld><p:bg><p:bgRef idx="1001"><a:schemeClr val="bg1"/></p:bgRef></p:bg>` +
+  `<p:spTree>${EMPTY_TREE}</p:spTree></p:cSld>` +
+  '<p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/>' +
+  '<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst>' +
+  '<p:txStyles><p:titleStyle><a:lvl1pPr><a:defRPr sz="4400"/></a:lvl1pPr></p:titleStyle>' +
+  '<p:bodyStyle><a:lvl1pPr><a:defRPr sz="1800"/></a:lvl1pPr></p:bodyStyle><p:otherStyle><a:lvl1pPr><a:defRPr sz="1800"/></a:lvl1pPr></p:otherStyle></p:txStyles></p:sldMaster>';
+const LAYOUT_XML = XML_HEAD + `<p:sldLayout ${PML} type="blank" preserve="1"><p:cSld name="Blank"><p:spTree>${EMPTY_TREE}</p:spTree></p:cSld>` +
+  '<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>';
+const VIEW_PROPS_XML = XML_HEAD + `<p:viewPr ${PML}><p:normalViewPr><p:restoredLeft sz="15620"/><p:restoredTop sz="94660"/></p:normalViewPr>` +
+  '<p:slideViewPr><p:cSldViewPr><p:cViewPr varScale="1"><p:scale><a:sx n="100" d="100"/><a:sy n="100" d="100"/></p:scale><p:origin x="0" y="0"/></p:cViewPr><p:guideLst/></p:cSldViewPr></p:slideViewPr>' +
+  '<p:gridSpacing cx="76200" cy="76200"/></p:viewPr>';
+
+/** All parts of the .pptx package for deck = { slides: [{ xml, rels }], media: [{ name, data }], font, title }. */
+function pptxParts(deck, sw, sh) {
+  const n = deck.slides.length, now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const slideIds = deck.slides.map((_, i) => `<p:sldId id="${256 + i}" r:id="rId${i + 2}"/>`).join('');
+  const presRels = [{ id: 'rId1', type: REL + 'slideMaster', target: 'slideMasters/slideMaster1.xml' }]
+    .concat(deck.slides.map((_, i) => ({ id: `rId${i + 2}`, type: REL + 'slide', target: `slides/slide${i + 1}.xml` })))
+    .concat([['theme', 'theme/theme1.xml'], ['presProps', 'presProps.xml'], ['viewProps', 'viewProps.xml'], ['tableStyles', 'tableStyles.xml']]
+      .map(([t, target], i) => ({ id: `rId${n + 2 + i}`, type: REL + t, target })));
+  const files = [
+    { name: '[Content_Types].xml', data: XML_HEAD + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/>' +
+      `<Override PartName="/ppt/presentation.xml" ContentType="${CT}presentationml.presentation.main+xml"/>` +
+      `<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="${CT}presentationml.slideMaster+xml"/>` +
+      `<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="${CT}presentationml.slideLayout+xml"/>` +
+      deck.slides.map((_, i) => `<Override PartName="/ppt/slides/slide${i + 1}.xml" ContentType="${CT}presentationml.slide+xml"/>`).join('') +
+      `<Override PartName="/ppt/theme/theme1.xml" ContentType="${CT}theme+xml"/>` +
+      `<Override PartName="/ppt/presProps.xml" ContentType="${CT}presentationml.presProps+xml"/>` +
+      `<Override PartName="/ppt/viewProps.xml" ContentType="${CT}presentationml.viewProps+xml"/>` +
+      `<Override PartName="/ppt/tableStyles.xml" ContentType="${CT}presentationml.tableStyles+xml"/>` +
+      '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>' +
+      `<Override PartName="/docProps/app.xml" ContentType="${CT}extended-properties+xml"/></Types>` },
+    { name: '_rels/.rels', data: rels([
+      { id: 'rId1', type: REL + 'officeDocument', target: 'ppt/presentation.xml' },
+      { id: 'rId2', type: 'http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties', target: 'docProps/core.xml' },
+      { id: 'rId3', type: REL + 'extended-properties', target: 'docProps/app.xml' }]) },
+    { name: 'docProps/core.xml', data: XML_HEAD + '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" ' +
+      'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" ' +
+      `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xmlText(deck.title)}</dc:title><dc:creator>Flow Chart Builder</dc:creator>` +
+      `<dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified></cp:coreProperties>` },
+    { name: 'docProps/app.xml', data: XML_HEAD + '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" ' +
+      `xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Flow Chart Builder</Application><Slides>${n}</Slides></Properties>` },
+    { name: 'ppt/presentation.xml', data: XML_HEAD + `<p:presentation ${PML} saveSubsetFonts="1">` +
+      '<p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst>' +
+      `<p:sldIdLst>${slideIds}</p:sldIdLst><p:sldSz cx="${sw}" cy="${sh}"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>` },
+    { name: 'ppt/_rels/presentation.xml.rels', data: rels(presRels) },
+    { name: 'ppt/presProps.xml', data: XML_HEAD + `<p:presentationPr ${PML}/>` },
+    { name: 'ppt/viewProps.xml', data: VIEW_PROPS_XML },
+    { name: 'ppt/tableStyles.xml', data: XML_HEAD + `<a:tblStyleLst xmlns:a="${NS_A}" def="{5C22544A-7EE6-4342-B048-85BDC9FD1C3A}"/>` },
+    { name: 'ppt/theme/theme1.xml', data: themeXml(deck.font) },
+    { name: 'ppt/slideMasters/slideMaster1.xml', data: MASTER_XML },
+    { name: 'ppt/slideMasters/_rels/slideMaster1.xml.rels', data: rels([
+      { id: 'rId1', type: REL + 'slideLayout', target: '../slideLayouts/slideLayout1.xml' },
+      { id: 'rId2', type: REL + 'theme', target: '../theme/theme1.xml' }]) },
+    { name: 'ppt/slideLayouts/slideLayout1.xml', data: LAYOUT_XML },
+    { name: 'ppt/slideLayouts/_rels/slideLayout1.xml.rels', data: rels([{ id: 'rId1', type: REL + 'slideMaster', target: '../slideMasters/slideMaster1.xml' }]) }
+  ];
+  deck.slides.forEach((sl, i) => {
+    files.push({ name: `ppt/slides/slide${i + 1}.xml`, data: sl.xml });
+    files.push({ name: `ppt/slides/_rels/slide${i + 1}.xml.rels`, data: rels(
+      [{ id: 'rId1', type: REL + 'slideLayout', target: '../slideLayouts/slideLayout1.xml' }]
+        .concat(sl.rels.map(r => ({ id: r.id, type: REL + 'image', target: r.target })))) });
+  });
+  deck.media.forEach(m => files.push({ name: 'ppt/media/' + m.name, data: m.data }));
+  return files;
+}
+
+/* ---------- Slide shapes ----------
+   Every builder returns { xml, b: [x0, y0, x1, y1] } (bounds in EMU, used to size groups). */
+const boundsOf = pts => pts.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])],
+  [Infinity, Infinity, -Infinity, -Infinity]);
+function rotatedBounds(x, y, w, h, rot) {
+  const c = [x + w / 2, y + h / 2], a = rad(rot), cs = Math.cos(a), sn = Math.sin(a);
+  return boundsOf([[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]]
+    .map(([u, v]) => [c[0] + u * cs - v * sn, c[1] + u * sn + v * cs]));
+}
+const xfrmXml = (x, y, w, h, rot = 0) =>
+  `<a:xfrm${angle60k(rot) ? ` rot="${angle60k(rot)}"` : ''}><a:off x="${x}" y="${y}"/><a:ext cx="${Math.max(1, w)}" cy="${Math.max(1, h)}"/></a:xfrm>`;
+const cNvPr = (sl, name, descr) => `<p:cNvPr id="${sl.nextId++}" name="${xmlText(name)}"${descr ? ` descr="${xmlText(descr)}"` : ''}/>`;
+const NO_LINE = '<a:ln><a:noFill/></a:ln>';
+
+/**
+ * A freeform shape. ops are in canvas px: ['M', pt] | ['L', pt] | ['A', center, r, startDeg, sweepDeg] | ['Z'].
+ * o: { fill, opacity, line, lineWidth (px), join: 'round' | 'miter' }.
+ */
+function spFreeform(sl, name, ops, o) {
+  const T = sl.T, em = p => [T.x(p[0]), T.y(p[1])], pts = [];
+  for (const op of ops) {
+    if (op[0] === 'M' || op[0] === 'L') pts.push(em(op[1]));
+    else if (op[0] === 'A') {
+      const [, c, r, a0, sw] = op, n = Math.max(2, Math.ceil(Math.abs(sw) / 5));
+      for (let i = 0; i <= n; i++) { const a = rad(a0 + sw * i / n); pts.push(em([c[0] + r * Math.cos(a), c[1] + r * Math.sin(a)])); }
+    }
+  }
+  if (!pts.length) return null;
+  const b = boundsOf(pts), w = Math.max(1, b[2] - b[0]), h = Math.max(1, b[3] - b[1]);
+  const pt = p => { const q = em(p); return `<a:pt x="${q[0] - b[0]}" y="${q[1] - b[1]}"/>`; };
+  const path = ops.map(op => {
+    switch (op[0]) {
+      case 'M': return `<a:moveTo>${pt(op[1])}</a:moveTo>`;
+      case 'L': return `<a:lnTo>${pt(op[1])}</a:lnTo>`;
+      case 'A': { const r = Math.max(1, T.len(op[2])); return `<a:arcTo wR="${r}" hR="${r}" stAng="${angle60k(op[3])}" swAng="${Math.round(op[4] * 60000)}"/>`; }
+      default: return '<a:close/>';
+    }
+  }).join('');
+  const op = o.opacity ?? 1, lw = o.line ? Math.max(1, T.len(o.lineWidth || 1)) : 0;
+  const ln = o.line ? `<a:ln w="${lw}" cap="flat">${solidFill(o.line, op)}${o.join === 'miter' ? '<a:miter lim="800000"/>' : '<a:round/>'}</a:ln>` : NO_LINE;
+  const xml = `<p:sp><p:nvSpPr>${cNvPr(sl, name)}<p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${xfrmXml(b[0], b[1], w, h)}` +
+    '<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="l" t="t" r="r" b="b"/>' +
+    `<a:pathLst><a:path w="${w}" h="${h}"${o.fill ? '' : ' fill="none"'}>${path}</a:path></a:pathLst></a:custGeom>` +
+    `${o.fill ? solidFill(o.fill, op) : '<a:noFill/>'}${ln}</p:spPr></p:sp>`;
+  return { xml, b: [b[0] - lw / 2, b[1] - lw / 2, b[2] + lw / 2, b[3] + lw / 2] };
+}
+const polyOps = (pts, close) => pts.map((p, i) => [i ? 'L' : 'M', p]).concat(close ? [['Z']] : []);
+
+/** One paragraph of text. o: { color, opacity, sizePx, bold, align, spacingPx, lineGapPx }. */
+function paraXml(sl, o, line) {
+  const T = sl.T, sz = clamp(Math.round(o.sizePx * T.pt * 100), 100, 400000), font = xmlText(sl.font);
+  const spc = o.spacingPx ? ` spc="${clamp(Math.round(o.spacingPx * T.pt * 100), -400000, 400000)}"` : '';
+  const gap = o.lineGapPx ? `<a:lnSpc><a:spcPts val="${clamp(Math.round(o.lineGapPx * T.pt * 100), 0, 158400)}"/></a:lnSpc>` : '';
+  const run = line ? `<a:r><a:rPr lang="en-US" sz="${sz}" b="${o.bold ? 1 : 0}"${spc} dirty="0">${solidFill(o.color, o.opacity ?? 1)}` +
+    `<a:latin typeface="${font}"/><a:cs typeface="${font}"/></a:rPr><a:t>${xmlText(line)}</a:t></a:r>` : '';
+  return `<a:p><a:pPr algn="${o.align || 'ctr'}">${gap}</a:pPr>${run}<a:endParaRPr lang="en-US" sz="${sz}" dirty="0"/></a:p>`;
+}
+const BODY_PR = '<a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" anchor="ctr" rtlCol="0"><a:noAutofit/></a:bodyPr><a:lstStyle/>';
+/** A text box centered on (cx, cy) canvas px, w × h px, turned by rot degrees. */
+function spText(sl, name, o) {
+  const T = sl.T, w = Math.max(1, T.len(o.w)), h = Math.max(1, T.len(o.h));
+  const x = T.x(o.cx) - Math.round(w / 2), y = T.y(o.cy) - Math.round(h / 2), rot = o.rot || 0;
+  const xml = `<p:sp><p:nvSpPr>${cNvPr(sl, name)}<p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${xfrmXml(x, y, w, h, rot)}` +
+    `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/>${NO_LINE}</p:spPr>` +
+    `<p:txBody>${BODY_PR}${o.lines.map(ln => paraXml(sl, o, ln)).join('')}</p:txBody></p:sp>`;
+  return { xml, b: rotatedBounds(x, y, w, h, rot) };
+}
+function spPicture(sl, name, rid, x, y, w, h, opacity = 1, descr) {
+  const T = sl.T, X = T.x(x), Y = T.y(y), W = Math.max(1, T.len(w)), H = Math.max(1, T.len(h));
+  const alpha = opacity < 1 ? `<a:alphaModFix amt="${Math.round(clamp(opacity, 0, 1) * 100000)}"/>` : '';
+  const xml = `<p:pic><p:nvPicPr>${cNvPr(sl, name, descr)}<p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>` +
+    `<p:blipFill><a:blip r:embed="${rid}">${alpha}</a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill>` +
+    `<p:spPr>${xfrmXml(X, Y, W, H)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`;
+  return { xml, b: [X, Y, X + W, Y + H] };
+}
+/** Group items (a single item is returned as is). Child coordinates stay in slide space. */
+function spGroup(sl, name, items, descr) {
+  items = items.flat().filter(Boolean);
+  if (!items.length) return null;
+  if (items.length === 1 && !descr) return items[0];
+  const b = items.reduce((u, it) => [Math.min(u[0], it.b[0]), Math.min(u[1], it.b[1]), Math.max(u[2], it.b[2]), Math.max(u[3], it.b[3])],
+    [Infinity, Infinity, -Infinity, -Infinity]).map(Math.round);
+  const w = Math.max(1, b[2] - b[0]), h = Math.max(1, b[3] - b[1]);
+  const xml = `<p:grpSp><p:nvGrpSpPr>${cNvPr(sl, name, descr)}<p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm>` +
+    `<a:off x="${b[0]}" y="${b[1]}"/><a:ext cx="${w}" cy="${h}"/><a:chOff x="${b[0]}" y="${b[1]}"/><a:chExt cx="${w}" cy="${h}"/>` +
+    `</a:xfrm></p:grpSpPr>${items.map(it => it.xml).join('')}</p:grpSp>`;
+  return { xml, b };
+}
+function addMedia(sl, bytes) {
+  const name = `image${sl.deck.media.length + 1}.png`, id = `rId${sl.rels.length + 2}`;
+  sl.deck.media.push({ name, data: bytes });
+  sl.rels.push({ id, target: '../media/' + name });
+  return id;
+}
+
+/* ---------- Ribbons ---------- */
+/**
+ * Outline of a band of half-width h around the center line pts, as freeform ops.
+ * Closed: an outer and an inner loop wound in opposite directions (a ring with a hole).
+ * Returns null when the inner edge folds back on itself (a bend tighter than the band is wide).
+ */
+function ribbonOutline(pts, h, closed) {
+  const P0 = pts.filter((p, i) => i === 0 || dist(p, pts[i - 1]) > 0.01);
+  if (closed && P0.length > 2 && dist(P0[0], P0[P0.length - 1]) < 0.01) P0.pop();
+  const n = P0.length;
+  if (n < 2) return null;
+  const seg = i => norm([P0[(i + 1) % n][0] - P0[i][0], P0[(i + 1) % n][1] - P0[i][1]]);
+  const L = [], R = [];
+  for (let i = 0; i < n; i++) {
+    const hasIn = closed || i > 0, hasOut = closed || i < n - 1;
+    const tIn = hasIn ? seg((i - 1 + n) % n) : seg(i), tOut = hasOut ? seg(i) : tIn;
+    const nIn = [-tIn[1], tIn[0]], nOut = [-tOut[1], tOut[0]];
+    const m = norm([nIn[0] + nOut[0], nIn[1] + nOut[1]]);
+    const len = h / Math.max(0.5, m[0] * nIn[0] + m[1] * nIn[1]);   // miter, at most 2h
+    L.push([P0[i][0] + m[0] * len, P0[i][1] + m[1] * len]);
+    R.push([P0[i][0] - m[0] * len, P0[i][1] - m[1] * len]);
+  }
+  const segs = closed ? n : n - 1;
+  for (let i = 0; i < segs; i++) {
+    const t = seg(i), j = (i + 1) % n;
+    for (const side of [L, R]) {
+      const d = [side[j][0] - side[i][0], side[j][1] - side[i][1]];
+      if (d[0] * t[0] + d[1] * t[1] < 0) return null;
+    }
+  }
+  if (closed) return polyOps(L, true).concat(polyOps(R.slice().reverse(), true));
+  return polyOps(L.concat(R.slice().reverse()), true);
+}
+function ribbonShape(sl, name, pts, thickness, closed, fill, opacity) {
+  const ops = ribbonOutline(pts, thickness / 2, closed);
+  if (ops) return spFreeform(sl, name, ops, { fill, opacity });
+  // folds on a very tight bend: export this piece as a thick line along its center instead
+  return spFreeform(sl, name, polyOps(pts, closed), { line: fill, lineWidth: thickness, opacity, join: 'round' });
+}
+function arcBandOps(s) {
+  const sw = sweep(s), th = arcThick(s), ro = s.r + th / 2, ri = Math.max(0, s.r - th / 2), a0 = s.startAngle, a1 = a0 + sw;
+  const at = (r, a) => [s.cx + r * Math.cos(rad(a)), s.cy + r * Math.sin(rad(a))];
+  const ops = [['M', at(ro, a0)], ['A', [s.cx, s.cy], ro, a0, sw], ['L', at(ri, a1)]];
+  if (ri > 0.5) ops.push(['A', [s.cx, s.cy], ri, a1, -sw]);
+  return ops.concat([['Z']]);
+}
+/** Arrowhead(s) like drawHead(): 'gap' is a thin V in the background color, notch-tail is filled with it. */
+function headShapes(sl, pts, style, fill, width, opacity, fillPoint) {
+  const bg = state.canvas.background;
+  if (style === 'gap') return [
+    fillPoint ? spFreeform(sl, 'Arrow point', polyOps(pts, true), { fill, opacity }) : null,
+    spFreeform(sl, 'Arrow cut', polyOps(pts, false), { line: bg, lineWidth: Math.max(2, width * 0.07), opacity, join: 'miter' })
+  ];
+  return [spFreeform(sl, 'Arrowhead', polyOps(pts, true), { fill: style === 'notch-tail' ? bg : fill, opacity })];
+}
+
+/* ---------- Text ---------- */
+const textStyle = t => ({
+  color: t.getAttribute('fill'), sizePx: +t.getAttribute('font-size') || 14,
+  bold: +t.getAttribute('font-weight') >= 600, spacingPx: +t.getAttribute('letter-spacing') || 0
+});
+/**
+ * A label along a band, rebuilt from where the browser placed each letter: one rotated text box when
+ * the letters turn only a little (or labels = 'straight'), otherwise one small box per letter.
+ */
+function labelShapes(sl, t, opacity) {
+  if (!t) return [];
+  const str = t.textContent, g = [];
+  for (let i = 0; i < t.getNumberOfChars(); i++) {
+    try {
+      const a = t.getStartPositionOfChar(i), b = t.getEndPositionOfChar(i);
+      g.push({ ch: str[i], a: [a.x, a.y], b: [b.x, b.y], rot: t.getRotationOfChar(i) });
+    } catch (_) { /* letter not laid out */ }
+  }
+  if (!g.length || !str.trim()) return [];
+  const st = Object.assign(textStyle(t), { opacity }), fs = st.sizePx;
+  let prev = g[0].rot, lo = prev, hi = prev;
+  for (const q of g) { q.rot = prev = unwrap(q.rot, prev); lo = Math.min(lo, q.rot); hi = Math.max(hi, q.rot); }
+  const straight = sl.labels === 'straight' || (sl.labels !== 'letters' && hi - lo <= STRAIGHT_LABEL_MAX);
+  if (straight) {
+    // middle of the letter run (by length along the letters), turned to the chord from first to last letter
+    const run = g.flatMap(q => [q.a, q.b]);
+    let total = 0;
+    for (let i = 1; i < run.length; i++) total += dist(run[i - 1], run[i]);
+    let c = run[0], acc = 0;
+    for (let i = 1; i < run.length; i++) {
+      const d = dist(run[i - 1], run[i]);
+      if (acc + d >= total / 2) { const u = d ? (total / 2 - acc) / d : 0; c = [run[i - 1][0] + (run[i][0] - run[i - 1][0]) * u, run[i - 1][1] + (run[i][1] - run[i - 1][1]) * u]; break; }
+      acc += d;
+    }
+    const first = g[0].a, last = g[g.length - 1].b, rot = deg(Math.atan2(last[1] - first[1], last[0] - first[0]));
+    return [spText(sl, 'Label: ' + str, Object.assign({ cx: c[0], cy: c[1], w: total + fs * 1.2, h: fs * 1.4, rot, lines: [str] }, st))];
+  }
+  const boxes = g.filter(q => q.ch && q.ch.trim()).map(q => spText(sl, q.ch, Object.assign({}, st, {
+    cx: (q.a[0] + q.b[0]) / 2, cy: (q.a[1] + q.b[1]) / 2, w: Math.max(dist(q.a, q.b), fs * 0.4) + fs * 0.5, h: fs * 1.4,
+    rot: q.rot, lines: [q.ch], spacingPx: 0
+  })));
+  return [spGroup(sl, 'Label: ' + str, boxes, str)];
+}
+/** A text box over a rendered <text> element's bounds. align: 'l' | 'ctr' | 'r'. */
+function boxForText(sl, name, t, lines, opacity, align = 'ctr', lineGapPx = 0) {
+  let bb;
+  try { bb = t.getBBox(); } catch (_) { return null; }
+  const st = textStyle(t), pad = st.sizePx * 0.6;
+  let x0 = bb.x, x1 = bb.x + bb.width;
+  if (align === 'l') x1 += pad; else if (align === 'r') x0 -= pad; else { x0 -= pad / 2; x1 += pad / 2; }
+  return spText(sl, name, Object.assign(st, {
+    cx: (x0 + x1) / 2, cy: bb.y + bb.height / 2, w: x1 - x0, h: bb.height, lines, opacity, align, lineGapPx
+  }));
+}
+
+/* ---------- Pictures inside the diagram (icons, uploaded images) ---------- */
+async function iconPng(sl, key, color, px) {
+  const id = `${key}|${color}|${px}`;
+  if (!sl.deck.iconCache.has(id)) {
+    const svgText = `<svg xmlns="${NS}" width="${px}" height="${px}" viewBox="-1 -1 26 26" style="color:${color}">${iconMarkup(key)}</svg>`;
+    sl.deck.iconCache.set(id, blobBytes(await svgToPng(svgText, px, px)));
+  }
+  return sl.deck.iconCache.get(id);
+}
+async function itemShapes(sl, s, g) {
+  const T = sl.T, sz = s.iconSize, hasIcon = !!(s.image || s.icon), hasText = !!String(s.text).trim();
+  const H = (hasIcon ? sz : 0) + (hasIcon && hasText ? s.gap : 0) + (hasText ? s.fontSize * 1.2 : 0), top = s.y - H / 2;
+  const px = clamp(Math.ceil(sz * T.k / EMU_PER_SCREEN_PX * 3), 48, 1024), out = [];
+  if (s.image) {
+    const img = await loadImage(s.image);
+    const iw = img.naturalWidth || sz, ih = img.naturalHeight || sz, r = Math.min(sz / iw, sz / ih);
+    const w = iw * r, h = ih * r, scale = Math.min(1024 / Math.max(w, h), Math.max(3, px / sz));
+    const bytes = await blobBytes(await drawToPng(img, w * scale, h * scale));
+    out.push(spPicture(sl, 'Picture', addMedia(sl, bytes), s.x - w / 2, top + (sz - h) / 2, w, h, s.opacity));
+  } else if (s.icon) {
+    const pad = sz / 24;   // the icon is drawn with a 1-unit margin so round line ends are not clipped
+    const rid = addMedia(sl, await iconPng(sl, s.icon, s.iconColor, px));
+    out.push(spPicture(sl, 'Icon: ' + ((ICONS[s.icon] || {}).name || s.icon), rid, s.x - sz / 2 - pad, top - pad, sz + 2 * pad, sz + 2 * pad, s.opacity));
+  }
+  if (hasText) out.push(boxForText(sl, 'Label: ' + s.text, g.querySelector('text'), [s.text], s.opacity));
+  return spGroup(sl, 'Icon + label: ' + s.text, out);
+}
+
+/* ---------- Diagram → slides ---------- */
+const labelEl = (g, pathId) => g.querySelector(`text.band-label[data-path="${CSS.escape(pathId)}"]`);
+async function shapeToSlide(sl, s) {
+  const g = shapesLayer.querySelector(`g.shape[data-id="${CSS.escape(s.id)}"]`);
+  if (!g) return null;
+  const op = s.opacity;
+  switch (s.type) {
+    case 'arc':
+      return spGroup(sl, 'Arc band ' + s.text, [spFreeform(sl, 'Arc band ' + s.text, arcBandOps(s), { fill: s.fill, opacity: op }),
+        labelShapes(sl, labelEl(g, 'cl-' + s.id), op)]);
+    case 'bezier':
+      return spGroup(sl, 'Bézier band ' + s.text, [ribbonShape(sl, 'Bézier band ' + s.text, sampleStrip(s), s.thickness, false, s.fill, op),
+        labelShapes(sl, labelEl(g, 'cl-' + s.id), op)]);
+    case 'path': {
+      // same paint order as renderPath(): layer by layer, each layer's pieces and then its arrows
+      const geo = pathGeo(s), whole = s.closed && !s.cuts.length, items = [];
+      const layers = new Map(), slot = L => { if (!layers.has(L)) layers.set(L, { pieces: [], arrows: [] }); return layers.get(L); };
+      pieceRanges(s).forEach((r, i) => slot(pieceLayer(s, i)).pieces.push([r, i]));
+      for (const a of pathArrowList(s)) slot(Math.max(pieceLayer(s, a.piece), pieceLayer(s, a.into))).arrows.push(a);
+      for (const L of [...layers.keys()].sort((a, b) => a - b)) {
+        const { pieces, arrows } = layers.get(L);
+        for (const [r, i] of pieces) {
+          const pc = s.pieces[i] || s.pieces[0], name = `Piece ${i + 1}` + (pc.text ? ' ' + pc.text : '');
+          items.push(spGroup(sl, name, [ribbonShape(sl, name, subPts(geo, r[0], r[1]), s.thickness, whole, pc.fill, op),
+            labelShapes(sl, labelEl(g, `cl-${s.id}-${i}`), op)]));
+        }
+        for (const a of arrows) {
+          const pc = s.pieces[a.piece] || s.pieces[0];
+          items.push(headShapes(sl, chevronPoints(geoAt(geo, a.pos), a.T, s.arrowStyle, s.arrowWidth, s.arrowLength), s.arrowStyle, pc.fill, s.arrowWidth, op, true));
+        }
+      }
+      const words = s.pieces.map(pc => pc.text).filter(Boolean);
+      return spGroup(sl, 'Snapped figure', items, words.length ? 'Flow: ' + words.join(' → ') : 'Ribbon figure');
+    }
+    case 'arrow': {
+      const pts = arrowPoints(s);
+      return pts ? spGroup(sl, 'Arrow', headShapes(sl, pts, s.style, s.fill, s.width, op, false)) : null;
+    }
+    case 'text':
+      if (!String(s.text).trim()) return null;
+      return boxForText(sl, 'Text: ' + s.text, g.querySelector('text'), String(s.text).split('\n'), op, 'ctr', s.fontSize * 1.2);
+    case 'title': {
+      const align = { left: 'l', center: 'ctr', right: 'r' }[s.align] || 'l', [tt, st] = g.querySelectorAll('text');
+      return spGroup(sl, 'Title', [String(s.title).trim() ? boxForText(sl, 'Title: ' + s.title, tt, [s.title], op, align) : null,
+        st ? boxForText(sl, 'Subtitle: ' + s.subtitle, st, [s.subtitle], op, align) : null]);
+    }
+    case 'circle': {
+      const T = sl.T, x = T.x(s.cx - s.r), y = T.y(s.cy - s.r), d = Math.max(1, T.len(2 * s.r));
+      const ln = s.strokeWidth > 0 ? `<a:ln w="${Math.max(1, T.len(s.strokeWidth))}">${solidFill(s.stroke, op)}</a:ln>` : NO_LINE;
+      const body = `<p:txBody>${BODY_PR}${paraXml(sl, { color: s.textColor, opacity: op, sizePx: s.fontSize, bold: s.bold }, s.text)}</p:txBody>`;
+      const xml = `<p:sp><p:nvSpPr>${cNvPr(sl, 'Badge ' + s.text)}<p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${xfrmXml(x, y, d, d)}` +
+        `<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>${solidFill(s.fill, op)}${ln}</p:spPr>${body}</p:sp>`;
+      return { xml, b: [x, y, x + d, y + d] };
+    }
+    case 'item': return itemShapes(sl, s, g);
+  }
+  return null;
+}
+const slideXml = (body, bg) => XML_HEAD + `<p:sld ${PML}><p:cSld><p:bg><p:bgPr>${solidFill(bg)}<a:effectLst/></p:bgPr></p:bg>` +
+  `<p:spTree>${EMPTY_TREE}${body}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
+function diagramWords() {
+  return [...state.shapes].sort((a, b) => a.z - b.z).flatMap(s =>
+    s.type === 'path' ? s.pieces.map(pc => pc.text) : s.type === 'title' ? [s.title] : [s.text]).filter(w => w && String(w).trim());
+}
+async function editableSlide(deck, T) {
+  const sl = { deck, T, nextId: 2, rels: [], font: deck.font, labels: deck.labels }, items = [];
+  for (const s of [...state.shapes].sort((a, b) => a.z - b.z)) items.push(await shapeToSlide(sl, s));
+  return { xml: slideXml(items.filter(Boolean).map(it => it.xml).join(''), state.canvas.background), rels: sl.rels };
+}
+async function pictureSlide(deck, T, area, scale) {
+  const sl = { deck, T, nextId: 2, rels: [], font: deck.font }, k = rasterScale(area, scale);
+  const png = await blobBytes(await svgToPng(exportSvgMarkup(area), area.w * k, area.h * k));
+  const pic = spPicture(sl, 'Flow chart picture', addMedia(sl, png), area.x, area.y, area.w, area.h, 1,
+    'Flow chart: ' + diagramWords().join(', '));
+  return { xml: slideXml(pic.xml, state.canvas.background), rels: sl.rels };
+}
+/** Build the .pptx for options o (see EXPORT_DEFAULTS). */
+async function buildPptx(o) {
+  render();
+  const area = exportArea(o.area), [sw, sh] = slideSize(o.slide, area), T = makeTransform(area, sw, sh);
+  const title = (state.shapes.find(s => s.type === 'title' && String(s.title).trim()) || {}).title || 'Flow chart';
+  const deck = { slides: [], media: [], font: EXPORT_FONTS.includes(o.font) ? o.font : 'Arial', labels: o.labels, title, iconCache: new Map() };
+  if (o.content !== 'picture') deck.slides.push(await editableSlide(deck, T));
+  if (o.content !== 'editable') deck.slides.push(await pictureSlide(deck, T, area, +o.pictureScale || 3));
+  for (const m of deck.media) m.data = await m.data;   // icon PNGs are shared promises
+  return zipFiles(pptxParts(deck, sw, sh), PPTX_MIME);
+}
+
+/* ---------- Export dialog ---------- */
+const exportDlg = $('#exportDlg'), exportForm = $('#exportForm');
+function loadExportPrefs() {
+  try { return Object.assign({}, EXPORT_DEFAULTS, JSON.parse(localStorage.getItem(EXPORT_PREFS_KEY) || '{}')); }
+  catch (_) { return Object.assign({}, EXPORT_DEFAULTS); }
+}
+function readExportForm() {
+  const o = {};
+  for (const k of Object.keys(EXPORT_DEFAULTS)) { const v = exportForm.elements[k]; if (v) o[k] = v.value; }
+  return o;
+}
+function syncExportForm() {
+  const o = readExportForm();
+  exportForm.querySelectorAll('[data-for]').forEach(r => {
+    const show = r.dataset.for.split(' ').includes(o.format) && (!r.dataset.content || r.dataset.content.split(' ').includes(o.content));
+    r.hidden = !show;
+  });
+  $('#exportGo').textContent = 'Download .' + o.format;
+}
+function openExport() {
+  if (!state.shapes.length) { toast('Nothing to export yet. Draw something first, or click Example.', true); return; }
+  const o = loadExportPrefs();
+  for (const k of Object.keys(EXPORT_DEFAULTS)) {
+    const v = exportForm.elements[k];
+    if (v) v.value = String(o[k]);
+  }
+  syncExportForm();
+  exportDlg.returnValue = '';
+  exportDlg.showModal();
+}
+async function runExport(o) {
+  try { localStorage.setItem(EXPORT_PREFS_KEY, JSON.stringify(o)); } catch (_) { /* storage unavailable */ }
+  const name = `flowchart-${stamp()}.${o.format}`;
+  try {
+    if (o.format === 'svg') download(new Blob([exportSvgMarkup(exportArea(o.area))], { type: 'image/svg+xml' }), name);
+    else if (o.format === 'png') {
+      const area = exportArea(o.area), k = rasterScale(area, +o.pngScale || 2);
+      download(await svgToPng(exportSvgMarkup(area), area.w * k, area.h * k), name);
+    } else {
+      toast('Building the PowerPoint file…');
+      download(await buildPptx(o), name);
+    }
+    toast('Exported ' + name);
+  } catch (err) {
+    console.error(err);
+    toast('Export failed: ' + err.message, true);
+  }
+}
+exportForm.addEventListener('change', syncExportForm);
+exportDlg.addEventListener('close', () => { if (exportDlg.returnValue === 'ok') runExport(readExportForm()); });
+
+/* =====================================================================
    Example: a simplified "MLOps Eternal Knot"
    ===================================================================== */
 function buildExample() {
@@ -2402,6 +3057,7 @@ const onClick = (id, fn) => $(id).addEventListener('click', e => { e.currentTarg
 onClick('#btnNew', newDiagram);
 onClick('#btnLoad', openLoad);
 onClick('#btnSave', saveJSON);
+onClick('#btnExport', openExport);
 const SAMPLE_URL = 'https://ragchamp.github.io/FLOWCHART/sample-json.json';
 onClick('#btnSample', async () => {
   if (!confirmDiscard()) return;
@@ -2462,11 +3118,13 @@ document.addEventListener('keydown', e => {
     else if (e.ctrlKey || e.metaKey) e.preventDefault();
     return;
   }
+  if (exportDlg.open) return;   // the dialog handles its own keys (Esc closes it)
   const ae = document.activeElement;
   const inField = ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);
   const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
   if (mod && k === 's') { e.preventDefault(); saveJSON(); return; }
   if (mod && k === 'o') { e.preventDefault(); openLoad(); return; }
+  if (mod && k === 'e') { e.preventDefault(); openExport(); return; }
   if (inField) { if (e.key === 'Escape') ae.blur(); return; }
   if (mod && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (mod && k === 'y') { e.preventDefault(); redo(); return; }
